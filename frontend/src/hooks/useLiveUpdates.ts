@@ -8,6 +8,15 @@ export function useLiveUpdates(onPlanChanged?: (event: PlanChangedEvent) => void
   const attemptsRef = useRef<number>(0);
   const maxAttempts = 5;
 
+  // Keep the latest callback in a ref so the connection effect below never has to depend on
+  // it. Callers routinely pass a fresh inline function on every render (e.g. an arrow function
+  // defined in JSX); depending on that identity would tear down and reopen the socket on every
+  // re-render instead of keeping one persistent connection for the component's lifetime.
+  const onPlanChangedRef = useRef(onPlanChanged);
+  useEffect(() => {
+    onPlanChangedRef.current = onPlanChanged;
+  }, [onPlanChanged]);
+
   useEffect(() => {
     let socket: WebSocket | null = null;
     let reconnectTimer: any = null;
@@ -35,7 +44,7 @@ export function useLiveUpdates(onPlanChanged?: (event: PlanChangedEvent) => void
             if (data.type === 'plan_changed') {
               const planEvent: PlanChangedEvent = data;
               setLastEvent(planEvent);
-              if (onPlanChanged) onPlanChanged(planEvent);
+              onPlanChangedRef.current?.(planEvent);
             }
           } catch (err) {
             console.error('Error parsing WebSocket message:', err);
@@ -71,7 +80,9 @@ export function useLiveUpdates(onPlanChanged?: (event: PlanChangedEvent) => void
         socket.close();
       }
     };
-  }, [onPlanChanged]);
+    // Intentionally empty: connect once per mount. `onPlanChangedRef` (kept fresh above)
+    // means this never needs to reconnect just because the caller re-rendered.
+  }, []);
 
   return { isConnected, lastEvent };
 }

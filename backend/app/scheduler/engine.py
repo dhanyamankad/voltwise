@@ -85,8 +85,12 @@ def _evaluate_window(
         green_score, price_sig, carbon_intensity = _get_signal_at_time(sample_dt, signals)
 
         total_green += green_score
-        # Scale 0-100 price signal index to realistic rate (₹/kWh, e.g. 60.0 index -> ₹6.00/kWh)
-        price_rate_per_kwh = price_sig / 10.0 if price_sig > 20.0 else price_sig
+        # Scale 0-100 price signal index to realistic rate (₹/kWh, e.g. 60.0 index -> ₹6.00/kWh).
+        # price_signal is ALWAYS a 0-100 index (see RenewableSignal model / forecasting.signal), so
+        # this conversion must be unconditional — a conditional threshold here previously caused a
+        # 10x pricing cliff right around index 20 (i.e. the greenest, cheapest hours of the day could
+        # suddenly look like the most expensive ones).
+        price_rate_per_kwh = price_sig / 10.0
         total_price += price_rate_per_kwh * energy_kwh
         total_co2 += (carbon_intensity * energy_kwh) / 1000.0  # g to kg
 

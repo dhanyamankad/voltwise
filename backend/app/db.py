@@ -299,3 +299,39 @@ def get_active_sessions() -> list[Session]:
             if parse_iso_datetime(sess.end_time) >= now_utc:
                 active.append(sess)
         return active
+
+
+def get_ports_with_live_status(active_sessions: Optional[list[Session]] = None) -> list[Port]:
+    """
+    Returns ports with status/current_session_id derived from currently active sessions,
+    instead of the persisted 'status' column.
+
+    create_ev_request() flips a port's stored status to 'occupied' the moment a session is
+    booked, but nothing ever flips it back to 'idle' once that session finishes or expires
+    (there's no background job or completion hook for that). Trusting the stored column
+    verbatim would leave a port showing 'occupied' forever after its very first booking, even
+    though scheduling itself works fine (it checks real session time-overlaps, not this flag).
+    Recomputing on every read keeps the displayed state honest regardless of persisted drift.
+    """
+    ports = get_ports()
+    sessions = active_sessions if active_sessions is not None else get_active_sessions()
+
+    # Soonest active session per port "wins" as the one currently occupying it
+    soonest_by_port: dict[str, Session] = {}
+    for s in sessions:
+        existing = soonest_by_port.get(s.port_id)
+        if existing is None or s.start_time < existing.start_time:
+            soonest_by_port[s.port_id] = s
+
+    reconciled: list[Port] = []
+    for port in ports:
+        occupying = soonest_by_port.get(port.id)
+        reconciled.append(
+            Port(
+                id=port.id,
+                status="occupied" if occupying else "idle",
+                power_limit_kw=port.power_limit_kw,
+                current_session_id=occupying.id if occupying else None,
+            )
+        )
+    return reconciled

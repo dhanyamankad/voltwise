@@ -112,6 +112,32 @@ class TestVoltWiseScheduler(unittest.TestCase):
         self.assertEqual(len(session_ids), len(set(session_ids)))
         self.assertTrue(all(s.id.startswith("session_EV-") for s in sessions))
 
+    def test_price_signal_scaling_has_no_discontinuity(self):
+        """
+        Regression test: price_signal is always a 0-100 relative index (never raw currency),
+        so converting it to a Rs./kWh rate must be a single continuous formula. A previous
+        version divided by 10 only above index 20 and used the raw index below it, causing
+        a ~10x pricing cliff exactly at the greenest, cheapest hours of the day.
+        """
+        from .engine import _evaluate_window
+
+        now = datetime.utcnow()
+
+        def make_signal(price_signal: float) -> list:
+            return [RenewableSignal(
+                timestamp=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                solar_irradiance=900.0, wind_speed=8.0, temperature=25.0,
+                renewable_score=95.0, price_signal=price_signal, carbon_intensity=20.0,
+            )]
+
+        _, _, price_19_9, _ = _evaluate_window(now, 1.0, "cheapest", make_signal(19.9), charging_rate_kw=50.0)
+        _, _, price_20_0, _ = _evaluate_window(now, 1.0, "cheapest", make_signal(20.0), charging_rate_kw=50.0)
+        _, _, price_20_1, _ = _evaluate_window(now, 1.0, "cheapest", make_signal(20.1), charging_rate_kw=50.0)
+
+        # A 0.1-point change in price_signal should move the estimate by a few paise, not ~Rs. 900.
+        self.assertAlmostEqual(price_20_0, price_20_1, delta=1.0)
+        self.assertAlmostEqual(price_19_9, price_20_0, delta=1.0)
+
     def test_old_window_tracking_in_reoptimize(self):
         """Verify reoptimize attaches _old_start_time and _old_end_time to changed sessions."""
         reqs, ports, signal_baseline = scenario_priority_ambulance()

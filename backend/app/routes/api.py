@@ -80,10 +80,7 @@ async def create_ev_request(req_in: EVRequestCreate):
         preference=req_in.preference,
         created_at=req_in.created_at or now_iso
     )
-    
-    # Save EV request to database
-    db.save_ev_request(ev_req)
-    
+
     # Fetch current ports, active sessions, and weather signal
     ports = db.get_ports()
     active_sessions = db.get_active_sessions()
@@ -92,11 +89,16 @@ async def create_ev_request(req_in: EVRequestCreate):
     # Run real scheduler engine with existing active sessions for conflict-free multi-port allocation
     raw_sessions = build_schedule([ev_req], ports, signal, existing_sessions=active_sessions)
     if not raw_sessions:
+        # Deliberately NOT persisted: the driver is told this request failed, so it must not
+        # linger as an unresolvable "ghost" entry in the operator's pending-requests queue.
         raise HTTPException(
             status_code=400,
             detail="Could not allocate charging slot: hard constraints (deadline/capacity) violated"
         )
-        
+
+    # Only persist the request once scheduling has actually succeeded.
+    db.save_ev_request(ev_req)
+
     session = _to_pydantic_session(raw_sessions[0])
     db.save_session(session)
     
@@ -133,8 +135,8 @@ async def get_schedule():
     Returns full station state snapshot: ports, active sessions,
     pending requests, and current renewable signal.
     """
-    ports = db.get_ports()
     active_sessions = db.get_active_sessions()
+    ports = db.get_ports_with_live_status(active_sessions)
     pending_requests = db.get_pending_ev_requests()
     signals = _get_active_signals()
     current_signal = signals[0] if signals else RenewableSignal(

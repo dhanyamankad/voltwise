@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Toaster, toast } from 'sonner';
 import { Header } from './components/Header';
 import { DriverView } from './views/DriverView';
@@ -12,16 +12,14 @@ import BackgroundSnippets from './components/ui/background-snippets';
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'landing' | 'driver' | 'operator'>('landing');
 
-  const showPlanChangedToast = (event: PlanChangedEvent) => {
+  const showPlanChangedToast = useCallback((event: PlanChangedEvent) => {
     toast.custom(
       (t) => <PlanChangedToast event={event} onDismiss={() => toast.dismiss(t)} />,
       { duration: 6000 }
     );
-  };
+  }, []);
 
-  const { isConnected } = useLiveUpdates((event) => {
-    showPlanChangedToast(event);
-  });
+  const { isConnected } = useLiveUpdates(showPlanChangedToast);
 
   const handleTriggerSimDrop = () => {
     window.dispatchEvent(

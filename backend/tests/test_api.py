@@ -8,8 +8,13 @@ os.environ["VOLTWISE_DB_PATH"] = os.path.join(os.path.dirname(__file__), "test_v
 
 from backend.app.main import app
 from backend.app import db
-from backend.app.models import EVRequest, Port, Session, RenewableSignal
-from backend.app.scheduler_stub import build_schedule, reoptimize
+# NOTE: test_priority_ev_protection below exercises the scheduler directly (not via HTTP),
+# so it must import the REAL production engine — the scheduler.models dataclasses are what
+# that engine actually expects. This used to import from `scheduler_stub` (an old placeholder
+# the app no longer runs) and `backend.app.models` (the pydantic API-layer models), so it was
+# silently testing throwaway code instead of the real priority-protection logic.
+from backend.app.scheduler.models import EVRequest, Port, Session, RenewableSignal
+from backend.app.scheduler.engine import build_schedule, reoptimize
 
 
 @pytest.fixture(autouse=True)
@@ -180,3 +185,60 @@ def test_websocket_connection(client):
     with client.websocket_connect("/ws/updates") as ws:
         # Ping websocket
         ws.send_text("ping")
+
+
+def test_port_returns_to_idle_after_session_ends(client):
+    """
+    Regression test: a port's live status must be derived from whether it currently has
+    an active session, not from the stored 'occupied' flag written at booking time — that
+    flag was never being reset, so a port stayed 'occupied' forever after its first use.
+    """
+    from backend.app.models import EVRequest as DbEVRequest, Session as DbSession
+    from datetime import timezone
+
+    now = datetime.now(timezone.utc)
+    req = DbEVRequest(
+        id="ev_finished", vehicle_class="normal", current_soc=20.0, target_soc=80.0,
+        deadline=(now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        charging_rate_kw=50.0, preference="balanced",
+        created_at=(now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    db.save_ev_request(req)
+    finished_session = DbSession(
+        id="session_ev_finished", ev_id="ev_finished", port_id="port_1",
+        start_time=(now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        end_time=(now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        status="scheduled", price_estimate=5.0, green_score=80.0, co2_estimate_kg=1.0,
+        reason="test", version=1,
+    )
+    db.save_session(finished_session)
+    port = next(p for p in db.get_ports() if p.id == "port_1")
+    port.status = "occupied"
+    port.current_session_id = finished_session.id
+    db.update_port(port)
+
+    response = client.get("/api/schedule")
+    port_1 = next(p for p in response.json()["ports"] if p["id"] == "port_1")
+    assert port_1["status"] == "idle", "Port should be idle once its only session has ended"
+    assert port_1["current_session_id"] is None
+
+
+def test_rejected_request_does_not_leak_into_pending_queue(client):
+    """
+    Regression test: an EV request the scheduler cannot satisfy must not be persisted, since
+    the driver already received a 400 error — otherwise it lingers forever as an unresolvable
+    "ghost" entry in the operator's pending-requests queue.
+    """
+    deadline = (datetime.now() + timedelta(minutes=1)).isoformat()
+    response = client.post("/api/ev-requests", json={
+        "vehicle_class": "normal",
+        "current_soc": 10.0,
+        "target_soc": 95.0,
+        "deadline": deadline,
+        "charging_rate_kw": 50.0,
+        "preference": "balanced",
+    })
+    assert response.status_code == 400
+
+    schedule = client.get("/api/schedule").json()
+    assert schedule["pending_requests"] == []

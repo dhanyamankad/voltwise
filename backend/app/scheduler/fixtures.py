@@ -32,32 +32,36 @@ def get_renewable_signal_baseline() -> List[RenewableSignal]:
     signals = []
     now_utc = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
 
+    # price_signal is a 0-100 relative price index (see RenewableSignal model / forecasting.signal),
+    # NOT a currency amount — the scheduler always converts it via price_signal / 10.0. These values
+    # were previously given as small ₹/kWh-like numbers (7-15), which is a different scale from the
+    # real forecasting module's output (10-100) and does not exercise realistic pricing in tests.
     hourly_profiles = [
         # (hour_offset, renewable_score, price_signal, carbon_intensity)
-        (0, 30.0, 8.0, 350.0),
-        (1, 28.0, 7.5, 360.0),
-        (2, 25.0, 7.0, 380.0),
-        (3, 25.0, 7.0, 380.0),
-        (4, 30.0, 7.2, 350.0),
-        (5, 40.0, 8.0, 300.0),
-        (6, 50.0, 9.0, 250.0),
-        (7, 60.0, 10.0, 200.0),
-        (8, 65.0, 11.0, 180.0),
-        (9, 75.0, 10.0, 140.0),
-        (10, 82.0, 9.0, 110.0),
-        (11, 88.0, 8.0, 90.0),
-        (12, 92.0, 7.0, 70.0),   # Peak Solar
-        (13, 90.0, 7.2, 80.0),
-        (14, 86.0, 7.5, 95.0),
-        (15, 84.0, 8.0, 105.0),
-        (16, 78.0, 9.0, 130.0),
-        (17, 68.0, 11.0, 170.0),
-        (18, 55.0, 14.0, 220.0),  # Evening Peak Grid Stress
-        (19, 45.0, 15.0, 270.0),
-        (20, 40.0, 13.0, 300.0),
-        (21, 35.0, 11.0, 320.0),
-        (22, 32.0, 9.5, 340.0),
-        (23, 30.0, 8.5, 350.0),
+        (0, 30.0, 80.0, 350.0),
+        (1, 28.0, 75.0, 360.0),
+        (2, 25.0, 70.0, 380.0),
+        (3, 25.0, 70.0, 380.0),
+        (4, 30.0, 72.0, 350.0),
+        (5, 40.0, 80.0, 300.0),
+        (6, 50.0, 90.0, 250.0),
+        (7, 60.0, 100.0, 200.0),
+        (8, 65.0, 55.0, 180.0),
+        (9, 75.0, 50.0, 140.0),
+        (10, 82.0, 45.0, 110.0),
+        (11, 88.0, 40.0, 90.0),
+        (12, 92.0, 35.0, 70.0),   # Peak Solar
+        (13, 90.0, 36.0, 80.0),
+        (14, 86.0, 37.5, 95.0),
+        (15, 84.0, 40.0, 105.0),
+        (16, 78.0, 45.0, 130.0),
+        (17, 68.0, 55.0, 170.0),
+        (18, 55.0, 70.0, 220.0),  # Evening Peak Grid Stress
+        (19, 45.0, 75.0, 270.0),
+        (20, 40.0, 65.0, 300.0),
+        (21, 35.0, 55.0, 320.0),
+        (22, 32.0, 47.5, 340.0),
+        (23, 30.0, 42.5, 350.0),
     ]
 
     for hr, green, price, carbon in hourly_profiles:
@@ -87,7 +91,7 @@ def get_renewable_signal_drop() -> List[RenewableSignal]:
     for idx, s in enumerate(signals):
         if 1 <= idx <= 4:
             s.renewable_score = 54.0
-            s.price_signal = 12.0
+            s.price_signal = 60.0
             s.carbon_intensity = 240.0
     return signals
 

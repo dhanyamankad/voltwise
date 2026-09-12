@@ -12,7 +12,11 @@ const ArcGauge: React.FC<{
   onChange: (val: number) => void;
   label: string;
   color: string;
-}> = ({ value, min = 0, max = 100, onChange, label, color }) => {
+  // 'current' describes the battery's present charge state (so the descriptor below reacts
+  // to the value); 'target' is always a goal, never a charge state, so its descriptor must
+  // stay fixed regardless of the number the driver picks.
+  variant: 'current' | 'target';
+}> = ({ value, min = 0, max = 100, onChange, label, color, variant }) => {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (value / max) * circumference * 0.75; // 270 deg arc
@@ -60,7 +64,7 @@ const ArcGauge: React.FC<{
             {value}%
           </span>
           <span className="font-sans text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-            {value < 50 ? 'Depleted' : 'Target'}
+            {variant === 'target' ? 'Target' : value < 50 ? 'Depleted' : 'Charged'}
           </span>
         </div>
       </div>
@@ -354,6 +358,7 @@ export const DriverView: React.FC = () => {
               max={100}
               onChange={setCurrentSoc}
               color="#38bdf8"
+              variant="current"
             />
             <ArcGauge
               label="Target SOC"
@@ -362,6 +367,7 @@ export const DriverView: React.FC = () => {
               max={100}
               onChange={setTargetSoc}
               color={isInvalidSoc ? '#f87171' : '#fbbf24'}
+              variant="target"
             />
           </div>
 
