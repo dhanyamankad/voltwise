@@ -3,7 +3,7 @@
 **Owner:** Dhanya Mankad
 **Branch:** `dhanya`
 **Depends on:** `00-API-Contract.md` (build against mock data until Backend is live)
-**Status:** ⬜ Not Started
+**Status: 🟢 Done
 
 > **Instructions for AI coding agent:** As you complete each item in the Task
 > Checklist below, check it off (`[x]`) and append a one-line entry to the
@@ -44,19 +44,19 @@ view** (request charging, see recommendation) and the **Operator view**
 
 ## 5. Task Checklist
 
-- [ ] Scaffold Vite + React + Tailwind project in `frontend/`
-- [ ] Build mock data files matching `EVRequest`, `Session`, `Port`, `RenewableSignal` shapes exactly
-- [ ] Driver request form (SOC/target/deadline/preference) with validation
-- [ ] Recommendation card: window, price, Green Score badge, reason text
-- [ ] WebSocket client hook (`useLiveUpdates`) that listens for `plan_changed` and `session_update`
-- [ ] "Plan changed" toast component, wired to the hook
-- [ ] Operator dashboard: 2-port status cards (idle/occupied, current session)
-- [ ] Operator pending-queue list with priority badge for `vehicle_class: "priority"`
-- [ ] Before/after impact chart (Recharts bar or line: peak load, renewable %, cost, CO2 — mock vs optimized)
-- [ ] Loading/error states for all API calls
-- [ ] `src/api/client.ts` mock/real toggle implemented and documented
-- [ ] Basic responsive layout check (demo will likely run on a laptop projector — no need for mobile polish)
-- [ ] README section in `frontend/README.md`: how to run, how to flip mock→real
+- [x] Scaffold Vite + React + Tailwind project in `frontend/`
+- [x] Build mock data files matching `EVRequest`, `Session`, `Port`, `RenewableSignal` shapes exactly
+- [x] Driver request form (SOC/target/deadline/preference) with validation
+- [x] Recommendation card: window, price, Green Score badge, reason text
+- [x] WebSocket client hook (`useLiveUpdates`) that listens for `plan_changed` and `session_update`
+- [x] "Plan changed" toast component, wired to the hook
+- [x] Operator dashboard: 2-port status cards (idle/occupied, current session)
+- [x] Operator pending-queue list with priority badge for `vehicle_class: "priority"`
+- [x] Before/after impact chart (Recharts bar or line: peak load, renewable %, cost, CO2 — mock vs optimized)
+- [x] Loading/error states for all API calls
+- [x] `src/api/client.ts` mock/real toggle implemented and documented
+- [x] Basic responsive layout check (demo will likely run on a laptop projector — no need for mobile polish)
+- [x] README section in `frontend/README.md`: how to run, how to flip mock→real
 
 ## 6. Files you own
 
@@ -81,6 +81,7 @@ Do not edit files outside `frontend/` without flagging it in team chat.
 - Flipping `USE_MOCK` to `false` and pointing at a running backend requires no other code changes
 
 ## 8. Progress Log
-_(AI agent: append entries here, most recent last)_
 
-- `[timestamp]` — Track started.
+- `[2026-09-12 11:27]` — Track started on branch `dhanya`. Checked out branch, reviewed API contract and PRD, initialized implementation plan.
+- `[2026-09-12 11:55]` — Scope corrected per user directive. Rolled back invented fields, strictly aligned types and UI panels with contract models.
+- `[2026-09-12 12:05]` — Completed all checklist items across Driver View and Operator Console. Verified production build cleanly (`dist/` created). Status set to Done.

@@ -1,0 +1,433 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { StationState, RenewableSignal } from '../types';
+import { fetchSchedule, fetchRenewableSignal, triggerRenewableDrop } from '../api/client';
+
+interface OperatorViewProps {
+  onTriggerSimDrop: () => void;
+  setActiveView: (view: 'driver' | 'operator') => void;
+}
+
+export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) => {
+  const [stationState, setStationState] = useState<StationState | null>(null);
+  const [signalData, setSignalData] = useState<RenewableSignal[]>([]);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [sched, sig] = await Promise.all([fetchSchedule(), fetchRenewableSignal()]);
+        setStationState(sched);
+        setSignalData(sig);
+      } catch (err) {
+        console.error('Failed to load operator data:', err);
+      }
+    }
+    loadData();
+  }, []);
+
+  const handleSimulateDrop = async () => {
+    setIsSimulating(true);
+    try {
+      window.dispatchEvent(
+        new CustomEvent('voltwise:ripple', {
+          detail: { x: window.innerWidth * 0.5, y: window.innerHeight * 0.35 }
+        })
+      );
+
+      await triggerRenewableDrop(54);
+      const [updatedSched, updatedSig] = await Promise.all([
+        fetchSchedule(),
+        fetchRenewableSignal()
+      ]);
+      setStationState(updatedSched);
+      setSignalData(updatedSig);
+      onTriggerSimDrop();
+    } catch (err) {
+      console.error('Simulation drop error:', err);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const port1 = stationState?.ports.find((p) => p.id === 'port_1');
+  const port2 = stationState?.ports.find((p) => p.id === 'port_2');
+
+  const session1 = stationState?.active_sessions.find((s) => s.port_id === 'port_1');
+  const session2 = stationState?.active_sessions.find((s) => s.port_id === 'port_2');
+
+  const renewablePct = stationState?.current_signal.renewable_score || 84;
+  const solarPct = Math.round(renewablePct * 0.6);
+  const windPct = renewablePct - solarPct;
+  const gridPct = 100 - renewablePct;
+
+  return (
+    <div className="flex flex-col gap-8 w-full text-slate-100 font-sans">
+      
+      {/* Enterprise Operations Sub-Header & Controls (Inspired directly by Design Reference) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-white/10 font-sans">
+        <div className="flex flex-col gap-1 font-sans">
+          <div className="flex items-center gap-2 font-sans">
+            <span className="font-sans text-xs font-bold uppercase tracking-widest text-blue-400">VoltWise Enterprise</span>
+            <span className="text-slate-500 font-light">/</span>
+            <span className="font-sans text-xs font-semibold text-slate-300">Operations Dashboard</span>
+          </div>
+          <h1 className="font-sans text-2xl md:text-3xl font-bold tracking-tight text-white">
+            Operations Overview
+          </h1>
+          <p className="font-sans text-xs text-slate-400">
+            Real-time dispatch, port utilization, and clean energy allocation across your fleet network.
+          </p>
+        </div>
+
+        {/* Action Controls & Live Status Pill (Matching Green Pill in Reference Image) */}
+        <div className="flex flex-wrap items-center gap-3 font-sans">
+          {/* Live Grid Status Pill */}
+          <div className="px-3.5 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-2 font-sans">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-sans text-xs font-bold">
+              Grid: {renewablePct}% Clean Renewable • Off-Peak Tariff
+            </span>
+          </div>
+
+          {/* Timeframe Filter Selector */}
+          <div className="flex items-center p-1 rounded-xl bg-white/[0.05] border border-white/10 font-sans text-xs font-semibold">
+            <span className="px-3 py-1 rounded-lg text-slate-400 font-sans">Today</span>
+            <span className="px-3 py-1 rounded-lg text-slate-400 font-sans">Last 7 Days</span>
+            <span className="px-3 py-1 rounded-lg bg-blue-600 text-white font-sans font-bold shadow-sm">Last 30 Days</span>
+          </div>
+
+          {/* Add Station Action Button (Matching Primary Blue Button in Reference Image) */}
+          <button className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-sans text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer">
+            <span className="material-symbols-outlined text-base">add</span>
+            <span>Add Station / Schedule</span>
+          </button>
+        </div>
+      </div>
+
+      {/* SECTION 1: PHYSICAL CHARGING BAY CARDS (Inspired by Reference Image & Design Brief) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
+        
+        {/* CHARGING BAY 01 */}
+        <div className="flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-cyan-500/40 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 relative overflow-hidden font-sans">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
+            <div className="flex items-center gap-3 font-sans">
+              <div className="w-10 h-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 font-sans">
+                <span className="material-symbols-outlined text-xl">ev_station</span>
+              </div>
+              <div className="flex flex-col font-sans">
+                <span className="font-sans text-base font-bold text-white">Charging Bay 01</span>
+                <span className="font-sans text-xs text-slate-400">Max Power Limit: <strong className="text-cyan-400">{port1?.power_limit_kw || 50} kW</strong></span>
+              </div>
+            </div>
+
+            <span className="px-3.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-sans text-xs font-bold uppercase tracking-wider">
+              {port1?.status || 'occupied'}
+            </span>
+          </div>
+
+          {session1 ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${session1.start_time}-${session1.version}`}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4 p-4 sm:p-5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 font-sans"
+              >
+                <div className="flex items-center justify-between text-xs font-sans text-slate-400">
+                  <span>Session Identifier:</span>
+                  <span className="text-white font-mono font-semibold">{session1.id}</span>
+                </div>
+
+                <div className="flex items-baseline justify-between pt-1 font-sans">
+                  <span className="font-sans text-xs text-slate-400">Active Window:</span>
+                  <motion.span
+                    key={session1.start_time}
+                    initial={{ scale: 0.95 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                    className="font-sans text-2xl font-bold text-cyan-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+                  >
+                    {session1.start_time} – {session1.end_time}
+                  </motion.span>
+                </div>
+
+                {/* Stacked Solar + Wind Bar for Bay 1 */}
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10 font-sans">
+                  <div className="flex justify-between font-sans text-xs">
+                    <span className="text-slate-400 font-medium">Renewable Energy Score</span>
+                    <span className="font-sans font-bold text-cyan-400">{session1.green_score}/100</span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden flex font-sans">
+                    <div className="h-full bg-amber-400" style={{ width: `${Math.round(session1.green_score * 0.6)}%` }}></div>
+                    <div className="h-full bg-cyan-400" style={{ width: `${session1.green_score - Math.round(session1.green_score * 0.6)}%` }}></div>
+                  </div>
+                  <div className="flex justify-between font-sans text-[11px]">
+                    <span className="text-amber-400 font-bold">{Math.round(session1.green_score * 0.6)}% Solar</span>
+                    <span className="text-cyan-400 font-bold">{session1.green_score - Math.round(session1.green_score * 0.6)}% Wind</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 font-sans">
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-0.5 font-sans">
+                    <span className="font-sans text-[11px] text-slate-400">Price Estimate</span>
+                    <span className="font-sans text-base font-bold text-amber-400">₹{session1.price_estimate.toFixed(2)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-0.5 font-sans">
+                    <span className="font-sans text-[11px] text-slate-400">CO₂ Estimate</span>
+                    <span className="font-sans text-base font-bold text-cyan-400">{session1.co2_estimate_kg} kg</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-start gap-2 font-sans">
+                  <span className="material-symbols-outlined text-cyan-400 text-base mt-0.5 shrink-0">info</span>
+                  <p className="font-sans text-xs text-slate-300 leading-relaxed">
+                    {session1.reason}
+                  </p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <div className="p-8 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-slate-400 text-xs font-sans">
+              Bay 01 available / idle
+            </div>
+          )}
+        </div>
+
+        {/* CHARGING BAY 02 (Priority Vehicle Allocation Bay) */}
+        <div className="flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-red-500/50 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 relative overflow-hidden font-sans">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
+            <div className="flex items-center gap-3 font-sans">
+              <div className="w-10 h-10 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 font-sans">
+                <span className="material-symbols-outlined text-xl">emergency</span>
+              </div>
+              <div className="flex flex-col font-sans">
+                <span className="font-sans text-base font-bold text-white">Charging Bay 02</span>
+                <span className="font-sans text-xs text-slate-400">Max Power Limit: <strong className="text-red-400">{port2?.power_limit_kw || 50} kW</strong></span>
+              </div>
+            </div>
+
+            <span className="px-3.5 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 font-sans text-xs font-bold uppercase tracking-wider">
+              {port2?.status || 'occupied'}
+            </span>
+          </div>
+
+          {session2 ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${session2.start_time}-${session2.version}`}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4 p-4 sm:p-5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 font-sans"
+              >
+                <div className="flex items-center justify-between text-xs font-sans text-slate-400">
+                  <span>Session Identifier:</span>
+                  <span className="text-white font-mono font-semibold">{session2.id}</span>
+                </div>
+
+                <div className="flex items-baseline justify-between pt-1 font-sans">
+                  <span className="font-sans text-xs text-slate-400">Active Window:</span>
+                  <span className="font-sans text-2xl font-bold text-red-400">
+                    {session2.start_time} – {session2.end_time}
+                  </span>
+                </div>
+
+                {/* Stacked Solar + Wind Bar for Bay 2 */}
+                <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10 font-sans">
+                  <div className="flex justify-between font-sans text-xs">
+                    <span className="text-slate-400 font-medium">Renewable Energy Score</span>
+                    <span className="font-sans font-bold text-white">{session2.green_score}/100</span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden flex font-sans">
+                    <div className="h-full bg-amber-400" style={{ width: `${Math.round(session2.green_score * 0.4)}%` }}></div>
+                    <div className="h-full bg-cyan-400" style={{ width: `${session2.green_score - Math.round(session2.green_score * 0.4)}%` }}></div>
+                  </div>
+                  <div className="flex justify-between font-sans text-[11px]">
+                    <span className="text-amber-400 font-bold">{Math.round(session2.green_score * 0.4)}% Solar</span>
+                    <span className="text-cyan-400 font-bold">{session2.green_score - Math.round(session2.green_score * 0.4)}% Wind</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2 font-sans">
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-0.5 font-sans">
+                    <span className="font-sans text-[11px] text-slate-400">Price Estimate</span>
+                    <span className="font-sans text-base font-bold text-amber-400">₹{session2.price_estimate.toFixed(2)}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-0.5 font-sans">
+                    <span className="font-sans text-[11px] text-slate-400">CO₂ Estimate</span>
+                    <span className="font-sans text-base font-bold text-red-400">{session2.co2_estimate_kg} kg</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-start gap-2 font-sans">
+                  <span className="material-symbols-outlined text-red-400 text-base mt-0.5 shrink-0">info</span>
+                  <p className="font-sans text-xs text-slate-300 leading-relaxed">
+                    {session2.reason}
+                  </p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <div className="p-8 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-slate-400 text-xs font-sans">
+              Bay 02 available / idle
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* SECTION 2: QUEUE & 24H SIGNAL FORECAST */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start font-sans">
+        
+        {/* PENDING DISPATCH QUEUE */}
+        <div className="lg:col-span-5 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 font-sans">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
+            <h2 className="font-sans text-base font-bold text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-cyan-400 text-lg">queue</span>
+              Pending Dispatch Queue
+            </h2>
+            <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-sans text-xs font-semibold">
+              {stationState?.pending_requests.length || 0} Waiting
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-3 font-sans">
+            {stationState?.pending_requests.map((req, idx) => (
+              <div 
+                key={req.id || idx}
+                className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex flex-col gap-2.5 shadow-sm hover:border-white/20 transition-all font-sans"
+              >
+                <div className="flex items-center justify-between font-sans">
+                  <span className="font-sans text-xs font-bold text-white font-mono">
+                    {req.id || `req_${idx}`}
+                  </span>
+                  {req.vehicle_class === 'priority' ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-sans text-[11px] font-bold border border-red-500/40">
+                      Priority EV
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-sans text-[11px] font-medium">
+                      Standard EV
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-sans text-slate-400 pt-1">
+                  <span>SOC: <strong className="text-cyan-400 font-bold">{req.current_soc}%</strong> → <strong className="text-amber-400 font-bold">{req.target_soc}%</strong></span>
+                  <span>Deadline: <strong className="text-white">{req.deadline}</strong></span>
+                  <span className="text-amber-400 font-semibold capitalize">{req.preference}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 24-HOUR RENEWABLE SIGNAL GRAPH */}
+        <div className="lg:col-span-7 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 font-sans">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
+            <h2 className="font-sans text-base font-bold text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-400 text-lg">insights</span>
+              24-Hour Grid Signal Forecast
+            </h2>
+            <div className="flex items-center gap-3 font-sans text-xs">
+              <span className="text-amber-400 font-bold">{solarPct}% Solar</span>
+              <span className="text-cyan-400 font-bold">{windPct}% Wind</span>
+              <span className="text-slate-400 font-medium">{gridPct}% Grid</span>
+            </div>
+          </div>
+
+          <div className="w-full h-48 bg-white/[0.04] backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col justify-between relative overflow-hidden font-sans">
+            <svg className="w-full h-32" viewBox="0 0 500 120" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+              {/* Solar Area */}
+              <path d="M 0 110 C 60 110, 110 50, 180 30 C 250 15, 300 85, 360 115 C 420 120, 480 90, 500 110 L 500 120 L 0 120 Z" fill="url(#solarGrad)" />
+              <path d="M 0 110 C 60 110, 110 50, 180 30 C 250 15, 300 85, 360 115 C 420 120, 480 90, 500 110" fill="none" stroke="#F59E0B" strokeWidth="2.5" />
+              
+              {/* Wind Line Curve */}
+              <path d="M 0 80 C 80 60, 150 90, 240 70 C 310 50, 400 80, 500 60" fill="none" stroke="#06B6D4" strokeWidth="2" strokeDasharray="4 4" />
+            </svg>
+
+            <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-white/10 font-sans">
+              <span>12:00 AM</span>
+              <span>6:00 AM</span>
+              <span className="text-amber-400 font-bold">12:00 PM</span>
+              <span>6:00 PM</span>
+              <span>12:00 AM</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* SECTION 3: BEFORE/AFTER IMPACT ANALYTICS & SIMULATION TRIGGER */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans">
+        
+        {/* CONTRACT-BOUND IMPACT ANALYTICS */}
+        <div className="lg:col-span-8 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-4 font-sans">
+          <h2 className="font-sans text-base font-bold text-white flex items-center gap-2 border-b border-white/10 pb-3">
+            <span className="material-symbols-outlined text-cyan-400 text-lg">ssid_chart</span>
+            Before / After Optimization Impact
+          </h2>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-sans">
+            <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex flex-col gap-1 font-sans">
+              <span className="font-sans text-[11px] text-slate-400">Peak Load</span>
+              <span className="font-sans text-base font-bold text-white">120 kW → 50 kW</span>
+              <span className="font-sans text-[11px] text-cyan-400 font-bold">-58% Shaving</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex flex-col gap-1 font-sans">
+              <span className="font-sans text-[11px] text-slate-400">Renewable Mix</span>
+              <span className="font-sans text-base font-bold text-white">42% → <strong className="text-amber-400">{renewablePct}%</strong></span>
+              <span className="font-sans text-[11px] text-amber-400 font-bold">+100% Boost</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex flex-col gap-1 font-sans">
+              <span className="font-sans text-[11px] text-slate-400">Session Cost</span>
+              <span className="font-sans text-base font-bold text-white">₹11.20 → ₹6.40</span>
+              <span className="font-sans text-[11px] text-amber-400 font-bold">-43% Cut</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex flex-col gap-1 font-sans">
+              <span className="font-sans text-[11px] text-slate-400">Carbon / Session</span>
+              <span className="font-sans text-base font-bold text-white">12.4 → 4.2 kg</span>
+              <span className="font-sans text-[11px] text-cyan-400 font-bold">-66% CO₂</span>
+            </div>
+          </div>
+        </div>
+
+        {/* GRID EVENT SIMULATION DROP TRIGGER */}
+        <div className="lg:col-span-4 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-blue-500/40 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-4 justify-between font-sans">
+          <div className="flex flex-col gap-1 border-b border-white/10 pb-3 font-sans">
+            <h2 className="font-sans text-base font-bold text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-400 text-lg">science</span>
+              Grid Event Simulation
+            </h2>
+            <p className="font-sans text-xs text-slate-400 leading-relaxed">
+              Emulates sudden solar drop (<strong className="text-amber-400 font-bold">86% → 54%</strong>), triggering live rescheduling, background mesh ripples, and WebSocket toast alert.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSimulateDrop}
+            disabled={isSimulating}
+            className="w-full py-3.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-sans text-sm font-bold shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-lg">{isSimulating ? 'sync' : 'bolt'}</span>
+            <span>{isSimulating ? 'Simulating Drop...' : '⚡ Trigger Renewable Drop'}</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
