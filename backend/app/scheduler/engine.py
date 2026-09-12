@@ -92,13 +92,13 @@ def _evaluate_window(
 
     avg_green = total_green / steps
 
-    # Score calculation based on preference
+    # Score calculation based on distinct driver optimization preference
     if preference == "greenest":
-        composite_score = avg_green * 2.0 - (total_price * 0.1)
+        composite_score = (avg_green * 5.0) - (total_price * 0.05)
     elif preference == "cheapest":
-        composite_score = (100.0 - total_price * 0.2) + (avg_green * 0.5)
+        composite_score = 500.0 - (total_price * 3.0) + (avg_green * 0.1)
     else:  # balanced
-        composite_score = (avg_green * 0.6) + ((100.0 - total_price * 0.1) * 0.4)
+        composite_score = (avg_green * 2.0) - (total_price * 0.5)
 
     return composite_score, avg_green, total_price, total_co2
 
