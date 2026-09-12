@@ -5,11 +5,15 @@ import { TubelightNavbar, NavItem } from './ui/tubelight-navbar';
 interface HeaderProps {
   activeView: 'landing' | 'driver' | 'operator';
   setActiveView: (view: 'landing' | 'driver' | 'operator') => void;
+  solarPct?: number;
+  windPct?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeView,
-  setActiveView
+  setActiveView,
+  solarPct,
+  windPct
 }) => {
   const navItems: NavItem[] = [
     { name: 'Driver View', url: '#', icon: Car },
