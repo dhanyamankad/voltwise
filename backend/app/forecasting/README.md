@@ -1,31 +1,35 @@
-# VoltWise — Forecasting & Simulation Module
+# VoltWise — Forecasting & Grid Simulation Module
 
-**Owner:** Vanshi Davda (`vanshi` branch)  
-**Track:** 04 — Forecasting, Simulation & Deployment  
-
-## Overview
-
-This module is responsible for:
-1. Pulling live hourly weather data (solar irradiance, wind speed, ambient temperature) from the Open-Meteo API for **Ahmedabad** (default city) and other supported locations.
-2. Deriving normalized `renewable_score` (0–100), `price_signal`, and `carbon_intensity` indicators for the scheduler engine.
-3. Providing automatic fallback resilience (`fallback_data.json`) when live weather API endpoints are unreachable or time out.
-4. Providing a simulation hook (`trigger_renewable_drop`) to script the live pitch deck demo event (86% → 54% renewable availability drop).
+**Track 04 (Vanshi Davda)** — Forecasting, Signal Generation & Simulation Engine (`backend/app/forecasting`).
 
 ---
 
-## Contract Compliance (`00-API-Contract.md` §5)
+## ⛅ Overview
+
+The Forecasting Module is responsible for:
+1. **Live Weather & Grid Data Fetching**: Pulling hourly solar irradiance ($\text{W/m}^2$), wind speed ($\text{m/s}$), and ambient temperature ($\text{°C}$) from the Open-Meteo API for **Ahmedabad** (default location) and supported cities.
+2. **Signal Derivation**: Calculating normalized 0–100 indicators:
+   - `renewable_score`: Composite solar + wind availability score.
+   - `price_signal`: Dynamic energy pricing index (inverse to renewable availability).
+   - `carbon_intensity`: Estimated $\text{gCO}_2/\text{kWh}$ emissions.
+3. **Offline Fallback Resilience**: Providing instant fallback dataset (`fallback_data.json`) when live weather API endpoints are unreachable or time out.
+4. **Grid Event Simulation**: Exposing simulation hook (`trigger_renewable_drop`) to script the live pitch deck demo event (86% → 54% solar availability drop at 1:30 PM).
+
+---
+
+## 📋 API Contract Compliance (`docs/00-API-Contract.md` §5)
 
 ### Functions Exposed
 
 ```python
 def get_renewable_signal(city: str = "Ahmedabad", hours_ahead: int = 24) -> list[dict]:
-    """Pulls Open-Meteo weather data and returns 24-hour renewable signal objects."""
+    """Pulls live Open-Meteo weather data and returns 24-hour renewable signal objects."""
 
 def trigger_renewable_drop(new_score: float = 54.0, target_hour_offset: int = 2) -> list[dict]:
     """Simulates a sudden drop in renewable power score for demo re-optimization testing."""
 ```
 
-### Data Shape
+### Signal Data Structure
 
 ```json
 {
@@ -41,10 +45,10 @@ def trigger_renewable_drop(new_score: float = 54.0, target_hour_offset: int = 2)
 
 ---
 
-## Direct Module Testing
+## 🧪 Module Testing & Verification
 
 To test signal retrieval, offline fallback, and renewable drop simulation directly:
 
 ```bash
-python -m backend.app.forecasting.test_forecasting
+python -m unittest backend/app/forecasting/test_forecasting.py
 ```

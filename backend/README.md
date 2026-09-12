@@ -1,40 +1,50 @@
-# VoltWise — FastAPI Backend Server
+# VoltWise Backend — FastAPI Server & REST/WS Gateway
 
-**Owner:** Rutvi Kariya & Team  
-**Package:** `backend/`
-
-FastAPI server providing REST endpoints, SQLite persistence, WebSocket realtime updates (`/ws/updates`), and integration with the Scheduling engine and Forecasting signals.
+**Track 02 (Rutvi Kariya)** — FastAPI backend server providing REST API endpoints, SQLite persistence, WebSocket real-time updates (`/ws/updates`), and seamless integration with the Scheduling Engine and Forecasting Module.
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Install Dependencies
+### 1. Set Up Virtual Environment & Dependencies
 ```bash
+cd backend
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-### 2. Start Server
+### 2. Start FastAPI Server
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
----
-
-## API Endpoints (`http://localhost:8000`)
-
-- `POST /api/ev-requests` — Submit new EV request, returns scheduled Session.
-- `GET /api/sessions/{id}` — Fetch session details by ID.
-- `GET /api/schedule` — Returns full `StationState` snapshot for Operator Dashboard.
-- `GET /api/renewable-signal` — Returns 24-hour renewable grid forecast.
-- `POST /api/simulate/renewable-drop` — Triggers 1:30 PM renewable drop event and broadcasts `PlanChangedEvent` over WebSocket.
-- `WS /ws/updates` — Realtime WebSocket connection for live UI toasts.
+The server will start at `http://localhost:8000`. Interactive OpenAPI documentation will be available at `http://localhost:8000/docs`.
 
 ---
 
-## Testing Endpoints with curl
+## 📡 API Endpoints (`http://localhost:8000`)
 
-### Create EV Request
+Matching `docs/00-API-Contract.md`:
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/ev-requests` | Submit new EV charging request; returns scheduled `Session`. |
+| `GET` | `/api/sessions/{id}` | Retrieve specific session details by ID. |
+| `GET` | `/api/schedule` | Returns full `StationState` snapshot (Ports, Queue, Metrics) for Operator Dashboard. |
+| `GET` | `/api/renewable-signal` | Returns 24-hour renewable grid forecast (solar irradiance, wind speed, price signal). |
+| `POST` | `/api/simulate/renewable-drop` | Triggers a simulated renewable drop event and broadcasts `PlanChangedEvent` over WebSockets. |
+| `WS` | `/ws/updates` | Real-time WebSocket endpoint for broadcasting live schedule re-optimizations. |
+
+---
+
+## 🧪 Testing Endpoints with `curl`
+
+### 1. Submit EV Charging Request
 ```bash
 curl -X POST "http://localhost:8000/api/ev-requests" \
   -H "Content-Type: application/json" \
@@ -48,9 +58,43 @@ curl -X POST "http://localhost:8000/api/ev-requests" \
   }'
 ```
 
-### Trigger Renewable Drop Simulation
+### 2. Fetch Station Schedule
+```bash
+curl -X GET "http://localhost:8000/api/schedule"
+```
+
+### 3. Trigger Renewable Drop Simulation
 ```bash
 curl -X POST "http://localhost:8000/api/simulate/renewable-drop" \
   -H "Content-Type: application/json" \
   -d '{ "new_score": 54.0 }'
+```
+
+---
+
+## 📁 Package Architecture
+
+```
+backend/
+├── app/
+│   ├── forecasting/            # Track 04: Open-Meteo weather & renewable signal generation
+│   │   ├── fallback_data.json  # Offline fallback signal dataset
+│   │   ├── signal.py           # Live weather fetch & renewable score derivation
+│   │   ├── simulate.py         # Renewable drop simulation handler
+│   │   └── test_forecasting.py # Forecasting test suite
+│   ├── scheduler/              # Track 03: 2-Port Optimization Engine
+│   │   ├── constraints.py      # Hard constraint checkers (port capacity, deadlines, priority lock)
+│   │   ├── engine.py           # Core build_schedule & reoptimize algorithms
+│   │   ├── fixtures.py         # Test fixtures & initial station state
+│   │   ├── models.py           # Scheduler data models
+│   │   ├── reasons.py          # AI rationale generators
+│   │   └── test_scheduler.py   # Scheduler unit test suite
+│   ├── db.py                   # SQLite database initialization & CRUD sessions
+│   ├── main.py                 # FastAPI application factory & router registration
+│   ├── models.py               # Pydantic & SQLAlchemy schemas
+│   ├── routes/
+│   │   └── api.py              # REST API route handlers
+│   └── ws.py                   # WebSocket connection manager & broadcaster
+├── requirements.txt
+└── README.md
 ```
