@@ -8,6 +8,21 @@ interface OperatorViewProps {
   setActiveView: (view: 'driver' | 'operator') => void;
 }
 
+function formatDisplayTime(timeStr?: string): string {
+  if (!timeStr) return '';
+  if (timeStr.includes('T') || timeStr.includes('Z')) {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+  }
+  return timeStr;
+}
+
 export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) => {
   const [stationState, setStationState] = useState<StationState | null>(null);
   const [signalData, setSignalData] = useState<RenewableSignal[]>([]);
@@ -145,12 +160,12 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                   <span className="font-sans text-xs text-slate-400">Active Window:</span>
                   <motion.span
                     key={session1.start_time}
-                    initial={{ scale: 0.95 }}
-                    animate={{ scale: 1 }}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2 }}
-                    className="font-sans text-2xl font-bold text-cyan-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+                    className="font-sans text-xl sm:text-2xl font-bold text-cyan-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]"
                   >
-                    {session1.start_time} – {session1.end_time}
+                    {formatDisplayTime(session1.start_time)} – {formatDisplayTime(session1.end_time)}
                   </motion.span>
                 </div>
 
@@ -231,8 +246,8 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
 
                 <div className="flex items-baseline justify-between pt-1 font-sans">
                   <span className="font-sans text-xs text-slate-400">Active Window:</span>
-                  <span className="font-sans text-2xl font-bold text-red-400">
-                    {session2.start_time} – {session2.end_time}
+                  <span className="font-sans text-xl sm:text-2xl font-bold text-red-400">
+                    {formatDisplayTime(session2.start_time)} – {formatDisplayTime(session2.end_time)}
                   </span>
                 </div>
 

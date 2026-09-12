@@ -76,6 +76,21 @@ const ArcGauge: React.FC<{
   );
 };
 
+function formatDisplayTime(timeStr?: string): string {
+  if (!timeStr) return '';
+  if (timeStr.includes('T') || timeStr.includes('Z')) {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+  }
+  return timeStr;
+}
+
 export const DriverView: React.FC = () => {
   const [vehicleClass, setVehicleClass] = useState<VehicleClass>('normal');
   const [currentSoc, setCurrentSoc] = useState<number>(25);
@@ -443,8 +458,8 @@ export const DriverView: React.FC = () => {
                     </div>
 
                     <div className="flex items-baseline gap-3 pt-1 relative z-10 font-sans">
-                      <span className="font-sans text-4xl sm:text-5xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_15px_rgba(37,99,235,0.4)]">
-                        {recommendation.start_time} – {recommendation.end_time}
+                      <span className="font-sans text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_15px_rgba(37,99,235,0.4)]">
+                        {formatDisplayTime(recommendation.start_time)} – {formatDisplayTime(recommendation.end_time)}
                       </span>
                     </div>
 
