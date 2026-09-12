@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
@@ -60,7 +60,7 @@ async def create_ev_request(req_in: EVRequestCreate):
     Accepts an EV charging request, invokes scheduler, saves state,
     broadcasts update to connected WebSocket clients, and returns the scheduled Session.
     """
-    now_iso = datetime.now().isoformat()
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     ev_id = f"ev_{uuid.uuid4().hex[:8]}"
     
     # Validate SOC Range
@@ -130,7 +130,7 @@ async def get_schedule():
     pending_requests = db.get_pending_ev_requests()
     signals = _get_active_signals()
     current_signal = signals[0] if signals else RenewableSignal(
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         solar_irradiance=0.0,
         wind_speed=0.0,
         temperature=20.0,
@@ -180,7 +180,7 @@ async def simulate_renewable_drop(payload: RenewableDropPayload):
     sched_sessions = [SchedulerSession(**s.model_dump()) for s in active_sessions]
     raw_changed = reoptimize(sched_sessions, updated_signal)
     
-    now_iso = datetime.now().isoformat()
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     for raw in raw_changed:
         changed = _to_pydantic_session(raw)
         db.update_session(changed)
