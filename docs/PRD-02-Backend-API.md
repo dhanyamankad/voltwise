@@ -3,7 +3,7 @@
 **Owner:** Rutvi Kariya
 **Branch:** `rutvi`
 **Depends on:** `00-API-Contract.md`; calls into Scheduler and Forecasting function boundaries (§4, §5)
-**Status:** ⬜ Not Started
+**Status:** 🟡 In Progress
 
 > **Instructions for AI coding agent:** As you complete each item in the Task
 > Checklist below, check it off (`[x]`) and append a one-line entry to the
@@ -49,22 +49,22 @@ Build your stubs to the exact function signatures in `00-API-Contract.md`
 
 ## 5. Task Checklist
 
-- [ ] Scaffold FastAPI project in `backend/`, `uvicorn` running on `:8000`
-- [ ] Define Pydantic models mirroring `00-API-Contract.md` §1 exactly
-- [ ] SQLite schema + simple ORM/queries for EVRequest, Session, Port
-- [ ] Write stub `scheduler_stub.py` (FCFS allocator) matching `build_schedule()` signature
-- [ ] Write stub `forecasting_stub.py` (hardcoded signal) matching `get_renewable_signal()` signature
-- [ ] `POST /api/ev-requests` — validates, calls scheduler, persists, returns Session
-- [ ] `GET /api/sessions/{id}`
-- [ ] `GET /api/schedule` — full StationState snapshot
-- [ ] `GET /api/renewable-signal` — proxies to forecasting function
-- [ ] `POST /api/simulate/renewable-drop` — updates signal, calls `reoptimize()`, persists changed sessions
-- [ ] WebSocket `/ws/updates` — broadcast `PlanChangedEvent` and `session_update` to all connected clients
-- [ ] CORS configured for local frontend dev origin
+- [x] Scaffold FastAPI project in `backend/`, `uvicorn` running on `:8000`
+- [x] Define Pydantic models mirroring `00-API-Contract.md` §1 exactly
+- [x] SQLite schema + simple ORM/queries for EVRequest, Session, Port
+- [x] Write stub `scheduler_stub.py` (FCFS allocator) matching `build_schedule()` signature
+- [x] Write stub `forecasting_stub.py` (hardcoded signal) matching `get_renewable_signal()` signature
+- [x] `POST /api/ev-requests` — validates, calls scheduler, persists, returns Session
+- [x] `GET /api/sessions/{id}`
+- [x] `GET /api/schedule` — full StationState snapshot
+- [x] `GET /api/renewable-signal` — proxies to forecasting function
+- [x] `POST /api/simulate/renewable-drop` — updates signal, calls `reoptimize()`, persists changed sessions
+- [x] WebSocket `/ws/updates` — broadcast `PlanChangedEvent` and `session_update` to all connected clients
+- [x] CORS configured for local frontend dev origin
 - [ ] Replace `scheduler_stub` import with real Scheduler module once available (single import line change)
 - [ ] Replace `forecasting_stub` import with real Forecasting module once available (single import line change)
-- [ ] Seed script: creates 2 ports + a few sample EV requests for demo bootstrapping
-- [ ] `backend/README.md`: how to run, how to hit each endpoint (curl examples)
+- [x] Seed script: creates 2 ports + a few sample EV requests for demo bootstrapping
+- [x] `backend/README.md`: how to run, how to hit each endpoint (curl examples)
 
 ## 6. Files you own
 
@@ -91,4 +91,4 @@ backend/
 ## 8. Progress Log
 _(AI agent: append entries here, most recent last)_
 
-- `[timestamp]` — Track started.
+- `2026-09-12 11:50` — Track started. Scaffolded environment, locked Pydantic contract, setting up FastAPI, SQLite, and stubs.
