@@ -1,63 +1,76 @@
-"""
-VoltWise FastAPI Backend Server
-
-API Server for Driver & Operator UI, WebSocket Realtime Updates, and Optimization Engine Orchestration.
-"""
-
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 
-from app.db import init_db
-from app.routes.api import router as api_router
-from app.ws import manager
+from backend.app import db
+from backend.app.ws import manager
+from backend.app.routes.api import router as api_router
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger("voltwise.main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup DB initialization
-    init_db()
+    # Initialize SQLite database and default ports
+    logger.info("Initializing SQLite database...")
+    db.init_db()
+    logger.info("VoltWise Backend started successfully.")
     yield
+    logger.info("VoltWise Backend shutting down.")
 
 
 app = FastAPI(
-    title="VoltWise API Server",
-    description="Adaptive EV Charging for a Renewable-Powered Grid",
+    title="VoltWise — Adaptive EV Charging API",
+    description="Backend API and Realtime engine coordinating EV charging with renewable signals for HackOut'26.",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# CORS middleware for local frontend dev (React/Vite)
+# CORS configuration for local frontend development (Vite, etc.)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include REST API routes
+# Mount REST API
 app.include_router(api_router)
 
 
 @app.get("/")
 async def root():
     return {
-        "status": "online",
-        "service": "VoltWise API",
-        "version": "1.0.0",
-        "docs": "/docs"
+        "service": "VoltWise Adaptive EV Charging API",
+        "status": "operational",
+        "docs_url": "/docs",
+        "ws_url": "/ws/updates"
     }
 
 
 @app.websocket("/ws/updates")
 async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time schedule updates and PlanChangedEvent notifications.
+    Frontend connects once and receives live JSON messages.
+    """
     await manager.connect(websocket)
     try:
         while True:
-            # Keep connection open and listen for ping/pong or client messages
+            # Keep connection open, client can send ping/heartbeat or messages
             data = await websocket.receive_text()
+            logger.debug(f"Received WS ping from client: {data}")
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"WebSocket error: {e}")
         manager.disconnect(websocket)

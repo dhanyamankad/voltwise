@@ -76,7 +76,8 @@ backend/
 │   ├── db.py
 │   ├── routes/
 │   ├── ws.py
-│   └── forecasting_stub.py
+│   ├── scheduler_stub.py      # replaced by real module later
+│   └── forecasting_stub.py    # replaced by real module later
 ├── requirements.txt
 └── README.md
 ```
@@ -90,5 +91,6 @@ backend/
 ## 8. Progress Log
 _(AI agent: append entries here, most recent last)_
 
-- `[2026-09-12T06:01:00Z]` — Track started.
-- `[2026-09-12T07:14:00Z]` — Built complete FastAPI server, SQLite DB persistence, REST endpoints, WebSocket `/ws/updates` broadcasting manager, and integrated real Scheduler module. Track complete.
+- `2026-09-12 11:50` — Track started. Scaffolded environment, locked Pydantic contract, setting up FastAPI, SQLite, and stubs.
+- `2026-09-12 12:35` — Merged tanvi branch into rutvi. Successfully integrated Tanvi's real Scheduler engine into backend/app/routes/api.py. All 12 test cases across scheduler and backend API passing.
+- `2026-09-12 12:57` — Merged vanshi branch into rutvi. Successfully integrated Vanshi's real Open-Meteo forecasting & simulation module into backend/app/routes/api.py. All 15 test cases passing 100%. Definition of Done met.

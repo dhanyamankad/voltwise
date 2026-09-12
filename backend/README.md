@@ -1,100 +1,119 @@
-# VoltWise Backend — FastAPI Server & REST/WS Gateway
+# VoltWise Backend (API + Realtime + Persistence)
 
-**Track 02 (Rutvi Kariya)** — FastAPI backend server providing REST API endpoints, SQLite persistence, WebSocket real-time updates (`/ws/updates`), and seamless integration with the Scheduling Engine and Forecasting Module.
+**Owner:** Rutvi Kariya (`rutvi` branch)  
+FastAPI REST server, SQLite persistence, and WebSocket push engine coordinating EV charging schedules with renewable energy signals.
 
 ---
 
-## 🚀 Quick Start
+## 1. Quick Start
 
-### 1. Set Up Virtual Environment & Dependencies
-```bash
-cd backend
-python -m venv venv
-# On Windows:
-venv\Scripts\activate
-# On Linux/macOS:
-source venv/bin/activate
+### Setup & Run locally
+```powershell
+# 1. Activate virtual environment
+.\backend\.venv\Scripts\activate
 
-pip install -r requirements.txt
+# 2. Run database seed (creates 2 ports + demo EV requests)
+python -m backend.seed
+
+# 3. Start the FastAPI server on :8000
+uvicorn backend.app.main:app --reload --port 8000
 ```
 
-### 2. Start FastAPI Server
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-The server will start at `http://localhost:8000`. Interactive OpenAPI documentation will be available at `http://localhost:8000/docs`.
+- **Interactive API Docs (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **WebSocket Endpoint:** `ws://localhost:8000/ws/updates`
 
 ---
 
-## 📡 API Endpoints (`http://localhost:8000`)
+## 2. API Endpoints
 
-Matching `docs/00-API-Contract.md`:
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/ev-requests` | Submit new EV charging request; returns scheduled `Session`. |
-| `GET` | `/api/sessions/{id}` | Retrieve specific session details by ID. |
-| `GET` | `/api/schedule` | Returns full `StationState` snapshot (Ports, Queue, Metrics) for Operator Dashboard. |
-| `GET` | `/api/renewable-signal` | Returns 24-hour renewable grid forecast (solar irradiance, wind speed, price signal). |
-| `POST` | `/api/simulate/renewable-drop` | Triggers a simulated renewable drop event and broadcasts `PlanChangedEvent` over WebSockets. |
-| `WS` | `/ws/updates` | Real-time WebSocket endpoint for broadcasting live schedule re-optimizations. |
-
----
-
-## 🧪 Testing Endpoints with `curl`
-
-### 1. Submit EV Charging Request
+### `POST /api/ev-requests`
+Submit a new charging request. Calls the scheduler engine, persists session, and broadcasts `session_update` to connected WebSocket clients.
 ```bash
-curl -X POST "http://localhost:8000/api/ev-requests" \
+curl -X POST http://localhost:8000/api/ev-requests \
   -H "Content-Type: application/json" \
   -d '{
     "vehicle_class": "normal",
-    "current_soc": 20.0,
+    "current_soc": 35.0,
     "target_soc": 80.0,
-    "deadline": "2026-09-12T18:00:00Z",
-    "charging_rate_kw": 50.0,
+    "deadline": "2026-09-12T18:00:00",
+    "charging_rate_kw": 11.0,
     "preference": "greenest"
   }'
 ```
 
-### 2. Fetch Station Schedule
+### `GET /api/sessions/{id}`
+Retrieve a specific session.
 ```bash
-curl -X GET "http://localhost:8000/api/schedule"
+curl http://localhost:8000/api/sessions/ses_123
 ```
 
-### 3. Trigger Renewable Drop Simulation
+### `GET /api/schedule`
+Full StationState snapshot for the operator dashboard:
+- `ports` (Port 1 & Port 2 status and power limits)
+- `active_sessions` (scheduled, charging, moved sessions)
+- `pending_requests`
+- `current_signal`
 ```bash
-curl -X POST "http://localhost:8000/api/simulate/renewable-drop" \
+curl http://localhost:8000/api/schedule
+```
+
+### `GET /api/renewable-signal`
+24-hour hourly weather and renewable forecast array (Austin demo city).
+```bash
+curl "http://localhost:8000/api/renewable-signal?city=Austin&hours_ahead=24"
+```
+
+### `POST /api/simulate/renewable-drop`
+The central hackathon demo event:
+- Injects a sudden renewable availability drop (e.g. 86% -> 54%).
+- Re-optimizes active flexible sessions (guaranteeing priority EVs are untouched).
+- Pushes `PlanChangedEvent` notification over WebSocket to the driver/operator UI.
+```bash
+curl -X POST http://localhost:8000/api/simulate/renewable-drop \
   -H "Content-Type: application/json" \
-  -d '{ "new_score": 54.0 }'
+  -d '{"new_score": 54.0}'
 ```
 
 ---
 
-## 📁 Package Architecture
-
+## 3. Realtime WebSocket (`/ws/updates`)
+Frontend subscribes once to `ws://localhost:8000/ws/updates`.  
+Pushes two message types:
+1. `PlanChangedEvent`:
+```json
+{
+  "type": "plan_changed",
+  "session_id": "ses_4a2f8b",
+  "old_window": { "start": "2026-09-12T13:30:00", "end": "2026-09-12T15:30:00" },
+  "new_window": { "start": "2026-09-12T15:15:00", "end": "2026-09-12T17:15:00" },
+  "reason": "Adapted to 15:15 — shifted away from grid dip to capture cleaner solar peak",
+  "timestamp": "2026-09-12T13:30:00"
+}
 ```
-backend/
-├── app/
-│   ├── forecasting/            # Track 04: Open-Meteo weather & renewable signal generation
-│   │   ├── fallback_data.json  # Offline fallback signal dataset
-│   │   ├── signal.py           # Live weather fetch & renewable score derivation
-│   │   ├── simulate.py         # Renewable drop simulation handler
-│   │   └── test_forecasting.py # Forecasting test suite
-│   ├── scheduler/              # Track 03: 2-Port Optimization Engine
-│   │   ├── constraints.py      # Hard constraint checkers (port capacity, deadlines, priority lock)
-│   │   ├── engine.py           # Core build_schedule & reoptimize algorithms
-│   │   ├── fixtures.py         # Test fixtures & initial station state
-│   │   ├── models.py           # Scheduler data models
-│   │   ├── reasons.py          # AI rationale generators
-│   │   └── test_scheduler.py   # Scheduler unit test suite
-│   ├── db.py                   # SQLite database initialization & CRUD sessions
-│   ├── main.py                 # FastAPI application factory & router registration
-│   ├── models.py               # Pydantic & SQLAlchemy schemas
-│   ├── routes/
-│   │   └── api.py              # REST API route handlers
-│   └── ws.py                   # WebSocket connection manager & broadcaster
-├── requirements.txt
-└── README.md
+2. `SessionUpdateMessage`:
+```json
+{
+  "type": "session_update",
+  "session": { ... }
+}
+```
+
+---
+
+## 4. Swapping Stubs for Real Modules
+To plug in Tanvi's Scheduler or Vanshi's Forecasting module, edit only these two lines in `backend/app/routes/api.py`:
+
+```python
+# Scheduler swap:
+from backend.app.scheduler.engine import build_schedule, reoptimize
+
+# Forecasting swap:
+from backend.app.forecasting.weather import get_renewable_signal, trigger_renewable_drop
+```
+
+---
+
+## 5. Running Automated Tests
+```powershell
+backend/.venv/Scripts/python -m pytest backend/tests/ -v
 ```

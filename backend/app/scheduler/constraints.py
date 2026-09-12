@@ -18,13 +18,15 @@ DEFAULT_BATTERY_CAPACITY_KWH = 60.0  # Standard EV battery size fallback in kWh
 
 
 def parse_iso_datetime(dt_str: str) -> datetime:
-    """Parses ISO 8601 datetime strings robustly."""
+    """Parses ISO 8601 datetime strings robustly, standardizing on naive datetimes."""
     if not dt_str:
         return datetime.utcnow()
-    # Normalize ISO format (e.g. Z to +00:00)
     cleaned = dt_str.replace("Z", "+00:00").strip()
     try:
-        return datetime.fromisoformat(cleaned)
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt
     except ValueError:
         pass
 

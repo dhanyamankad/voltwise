@@ -1,179 +1,200 @@
-"""
-VoltWise REST API Routes
-
-Implements endpoints specified in docs/00-API-Contract.md §2.
-"""
-
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import List, Dict, Any
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Optional
+from fastapi import APIRouter, HTTPException, Query
 
-from app.models import (
-    EVCreateRequest,
-    EVRequestModel,
-    SessionModel,
-    PortModel,
-    RenewableSignalModel,
+from backend.app.models import (
+    EVRequestCreate,
+    EVRequest,
+    Session,
+    Port,
+    RenewableSignal,
     StationState,
-    RenewableDropRequest,
-    PlanChangedEvent
+    RenewableDropPayload,
+    PlanChangedEvent,
+    TimeWindow,
+    GenericOkResponse
 )
-from app.db import (
-    save_ev_request,
-    get_all_ev_requests,
-    save_session,
-    get_all_sessions,
-    get_session_by_id,
-    get_ports
-)
-from app.ws import manager
-from app.forecasting_stub import get_renewable_signal, trigger_renewable_drop
-from app.scheduler import build_schedule, reoptimize, EVRequest, Port, Session, RenewableSignal
+from backend.app import db
+from backend.app.ws import manager
+
+# --- Modular Imports for Scheduler and Forecasting ---
+# Tanvi's real Scheduler engine:
+from backend.app.scheduler.engine import build_schedule, reoptimize
+from backend.app.scheduler.models import Session as SchedulerSession
+# Vanshi's real Forecasting & Simulation engine:
+from backend.app.forecasting.signal import get_renewable_signal
+from backend.app.forecasting.simulate import trigger_renewable_drop, get_current_signal
+
+
+def _to_pydantic_session(s) -> Session:
+    if isinstance(s, Session):
+        return s
+    if hasattr(s, "to_dict"):
+        return Session(**s.to_dict())
+    return Session(**dict(s))
+
+
+def _to_pydantic_signal(item) -> RenewableSignal:
+    if isinstance(item, RenewableSignal):
+        return item
+    return RenewableSignal(**item)
+
+
+def _get_active_signals(city: str = "ahmedabad", hours_ahead: int = 24) -> list[RenewableSignal]:
+    try:
+        raw = get_current_signal(city=city)
+        if not raw:
+            raw = get_renewable_signal(city=city, hours_ahead=hours_ahead)
+    except Exception:
+        raw = get_renewable_signal(city=city, hours_ahead=hours_ahead)
+    return [_to_pydantic_signal(item) for item in raw]
+
 
 router = APIRouter(prefix="/api")
 
 
-def _model_to_dict(obj):
-    return obj.model_dump() if hasattr(obj, "model_dump") else obj.dict()
-
-
-@router.post("/ev-requests", response_model=SessionModel)
-async def create_ev_request(req: EVCreateRequest):
+@router.post("/ev-requests", response_model=Session, status_code=201)
+async def create_ev_request(req_in: EVRequestCreate):
     """
-    POST /api/ev-requests
-    Accepts new driver EV charging request, invokes scheduler, persists, and returns assigned Session.
+    Accepts an EV charging request, invokes scheduler, saves state,
+    broadcasts update to connected WebSocket clients, and returns the scheduled Session.
     """
-    try:
-        req.check_soc_range()
-    except ValueError as val_err:
-        raise HTTPException(status_code=400, detail=str(val_err))
-
-    req_id = f"ev_{uuid.uuid4().hex[:6]}"
-    created_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-
+    now_iso = datetime.now().isoformat()
+    ev_id = f"ev_{uuid.uuid4().hex[:8]}"
+    
     ev_req = EVRequest(
-        id=req_id,
-        vehicle_class=req.vehicle_class,
-        current_soc=req.current_soc,
-        target_soc=req.target_soc,
-        deadline=req.deadline,
-        charging_rate_kw=req.charging_rate_kw,
-        preference=req.preference,
-        created_at=created_at
+        id=ev_id,
+        vehicle_class=req_in.vehicle_class,
+        current_soc=req_in.current_soc,
+        target_soc=req_in.target_soc,
+        deadline=req_in.deadline,
+        charging_rate_kw=req_in.charging_rate_kw,
+        preference=req_in.preference,
+        created_at=req_in.created_at or now_iso
     )
-    save_ev_request(ev_req.to_dict())
-
-    # Fetch existing requests, ports, and signal
-    all_raw_reqs = get_all_ev_requests()
-    all_ev_reqs = [EVRequest(**r) for r in all_raw_reqs]
-    raw_ports = get_ports()
-    ports = [Port(**p) for p in raw_ports]
-    signals = get_renewable_signal()
-
-    # Re-run scheduler for all pending requests
-    sessions = build_schedule(all_ev_reqs, ports, signals)
-
-    target_session = None
-    for s in sessions:
-        save_session(s.to_dict())
-        if s.ev_id == req_id:
-            target_session = s
-
-    if not target_session:
-        raise HTTPException(status_code=400, detail="Could not schedule EV request within given deadline or port constraints.")
-
-    # Broadcast session update over WebSocket
-    await manager.broadcast({
+    
+    # Save EV request to database
+    db.save_ev_request(ev_req)
+    
+    # Fetch current ports and weather signal
+    ports = db.get_ports()
+    signal = _get_active_signals()
+    
+    # Run real scheduler engine
+    raw_sessions = build_schedule([ev_req], ports, signal)
+    if not raw_sessions:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not allocate charging slot: hard constraints (deadline/capacity) violated"
+        )
+        
+    session = _to_pydantic_session(raw_sessions[0])
+    db.save_session(session)
+    
+    # Broadcast session_update over WebSocket
+    await manager.broadcast_json({
         "type": "session_update",
-        "session": target_session.to_dict()
+        "session": session.model_dump()
     })
+    
+    return session
 
-    return SessionModel(**target_session.to_dict())
 
-
-@router.get("/sessions/{session_id}", response_model=SessionModel)
+@router.get("/sessions/{session_id}", response_model=Session)
 async def get_session(session_id: str):
     """
-    GET /api/sessions/{id}
-    Retrieves a session by ID.
+    Retrieves a specific charging session by ID.
     """
-    sess = get_session_by_id(session_id)
-    if not sess:
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
-    return SessionModel(**sess)
+    session = db.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    return session
 
 
 @router.get("/schedule", response_model=StationState)
-async def get_station_schedule():
+async def get_schedule():
     """
-    GET /api/schedule
-    Returns full StationState snapshot for Operator Dashboard.
+    Returns full station state snapshot: ports, active sessions,
+    pending requests, and current renewable signal.
     """
-    ports_raw = get_ports()
-    sessions_raw = get_all_sessions()
-    requests_raw = get_all_ev_requests()
-    signals = get_renewable_signal()
-
-    ports = [PortModel(**p) for p in ports_raw]
-    active_sessions = [SessionModel(**s) for s in sessions_raw if s["status"] in ("scheduled", "charging", "moved")]
-    pending_requests = [EVRequestModel(**r) for r in requests_raw]
-    current_sig = RenewableSignalModel(**signals[12].to_dict()) if len(signals) > 12 else RenewableSignalModel(**signals[0].to_dict())
-
+    ports = db.get_ports()
+    active_sessions = db.get_active_sessions()
+    pending_requests = db.get_ev_requests()
+    signals = _get_active_signals()
+    current_signal = signals[0] if signals else RenewableSignal(
+        timestamp=datetime.now().isoformat(),
+        solar_irradiance=0.0,
+        wind_speed=0.0,
+        temperature=20.0,
+        renewable_score=50.0,
+        price_signal=0.15,
+        carbon_intensity=250.0
+    )
+    
     return StationState(
         ports=ports,
         active_sessions=active_sessions,
         pending_requests=pending_requests,
-        current_signal=current_sig
+        current_signal=current_signal
     )
 
 
-@router.get("/renewable-signal", response_model=List[RenewableSignalModel])
-async def get_renewable_signals(city: str = "DemoCity"):
+@router.get("/renewable-signal", response_model=list[RenewableSignal])
+async def get_signal_endpoint(
+    city: str = Query(default="ahmedabad", description="Demo city name"),
+    hours_ahead: int = Query(default=24, ge=1, le=48, description="Forecast horizon")
+):
     """
-    GET /api/renewable-signal?city=
-    Returns 24-hour renewable energy signal array.
+    Returns 24-hour renewable availability, price, and carbon intensity signals.
     """
-    signals = get_renewable_signal(city=city)
-    return [RenewableSignalModel(**s.to_dict()) for s in signals]
+    return _get_active_signals(city=city, hours_ahead=hours_ahead)
 
 
-@router.post("/simulate/renewable-drop")
-async def simulate_renewable_drop(payload: RenewableDropRequest):
+@router.post("/simulate/renewable-drop", response_model=GenericOkResponse)
+async def simulate_renewable_drop(payload: RenewableDropPayload):
     """
-    POST /api/simulate/renewable-drop
-    Triggers renewable availability drop event, reoptimizes flexible sessions, updates DB,
-    and broadcasts PlanChangedEvent over WebSocket.
+    In-memory simulation endpoint:
+    1. Triggers the renewable availability drop.
+    2. Runs reoptimize() on active flexible sessions (protecting priority EVs).
+    3. Persists changed sessions.
+    4. Pushes PlanChangedEvent to all WebSocket clients.
     """
+    # 1. Update signal state via simulation hook
     trigger_renewable_drop(new_score=payload.new_score)
-    updated_signal = get_renewable_signal()
-
-    raw_sessions = get_all_sessions()
-    sessions = [Session(**s) for s in raw_sessions]
-
-    # Reoptimize flexible sessions
-    changed_sessions = reoptimize(sessions, updated_signal)
-
-    for sess in changed_sessions:
-        save_session(sess.to_dict())
-
-        old_start = getattr(sess, "_old_start_time", sess.start_time)
-        old_end = getattr(sess, "_old_end_time", sess.end_time)
-
-        # Broadcast PlanChangedEvent for each rescheduled session
+    updated_signal = _get_active_signals()
+    
+    # 2. Re-optimize active sessions
+    active_sessions = db.get_active_sessions()
+    
+    # Store old windows before mutation
+    old_windows = {s.id: (s.start_time, s.end_time) for s in active_sessions}
+    
+    sched_sessions = [SchedulerSession(**s.model_dump()) for s in active_sessions]
+    raw_changed = reoptimize(sched_sessions, updated_signal)
+    
+    now_iso = datetime.now().isoformat()
+    for raw in raw_changed:
+        changed = _to_pydantic_session(raw)
+        db.update_session(changed)
+        
+        old_start, old_end = old_windows.get(changed.id, (changed.start_time, changed.end_time))
+        
         event = PlanChangedEvent(
             type="plan_changed",
-            session_id=sess.id,
-            old_window={"start": old_start, "end": old_end},
-            new_window={"start": sess.start_time, "end": sess.end_time},
-            reason=sess.reason,
-            timestamp=datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+            session_id=changed.id,
+            old_window=TimeWindow(start=old_start, end=old_end),
+            new_window=TimeWindow(start=changed.start_time, end=changed.end_time),
+            reason=changed.reason,
+            timestamp=now_iso
         )
-        await manager.broadcast(_model_to_dict(event))
-
-    return {
-        "ok": True,
-        "message": f"Renewable drop triggered to {payload.new_score}%. Re-optimized {len(changed_sessions)} sessions.",
-        "rescheduled_count": len(changed_sessions)
-    }
-
+        
+        # Broadcast PlanChangedEvent
+        await manager.broadcast_json(event.model_dump())
+        # Also broadcast session_update so operator port cards update
+        await manager.broadcast_json({
+            "type": "session_update",
+            "session": changed.model_dump()
+        })
+        
+    return GenericOkResponse(ok=True)

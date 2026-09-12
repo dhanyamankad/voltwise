@@ -1,85 +1,90 @@
-"""
-VoltWise Backend API Pydantic Models
-
-Matches exact data models specified in docs/00-API-Contract.md §1.
-"""
-
-from typing import Literal, Optional, List
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-VehicleClass = Literal["normal", "priority"]
-PreferenceType = Literal["balanced", "cheapest", "greenest"]
-SessionStatus = Literal["scheduled", "charging", "completed", "moved", "cancelled"]
-PortId = Literal["port_1", "port_2"]
-PortStatus = Literal["idle", "occupied"]
+class EVRequestCreate(BaseModel):
+    vehicle_class: Literal["normal", "priority"] = Field(
+        default="normal",
+        description="priority = ambulance/fleet/delivery, normal = consumer EV"
+    )
+    current_soc: float = Field(..., ge=0, le=100, description="Current SOC percentage 0-100")
+    target_soc: float = Field(..., ge=0, le=100, description="Target SOC percentage 0-100")
+    deadline: str = Field(..., description="ISO 8601 datetime, ready by")
+    charging_rate_kw: float = Field(default=11.0, gt=0, description="Vehicle max charge rate kW")
+    preference: Literal["balanced", "cheapest", "greenest"] = Field(
+        default="balanced",
+        description="Driver preference for scheduling"
+    )
+    created_at: Optional[str] = Field(default=None, description="ISO 8601 datetime, optional at creation")
 
 
-class EVCreateRequest(BaseModel):
-    vehicle_class: VehicleClass = "normal"
-    current_soc: float = Field(..., ge=0.0, le=100.0, description="Current SOC percentage")
-    target_soc: float = Field(..., ge=0.0, le=100.0, description="Target SOC percentage")
-    deadline: str = Field(..., description="ISO 8601 ready by deadline")
-    charging_rate_kw: float = Field(50.0, gt=0.0, description="Vehicle max charge rate in kW")
-    preference: PreferenceType = "balanced"
-
-    def check_soc_range(self):
-        if self.target_soc <= self.current_soc:
-            raise ValueError("Target SOC must be strictly greater than current SOC.")
+class EVRequest(EVRequestCreate):
+    id: str = Field(..., description="Unique EV Request ID (e.g. ev_123)")
+    created_at: str = Field(..., description="ISO 8601 datetime")
 
 
-
-class EVRequestModel(EVCreateRequest):
-    id: str
-    created_at: str
-
-
-class SessionModel(BaseModel):
-    id: str
-    ev_id: str
-    port_id: PortId
-    start_time: str
-    end_time: str
-    status: SessionStatus = "scheduled"
-    price_estimate: float = 0.0
-    green_score: float = 0.0
-    co2_estimate_kg: float = 0.0
-    reason: str = ""
-    version: int = 1
+class Session(BaseModel):
+    id: str = Field(..., description="Unique Session ID (e.g. ses_123)")
+    ev_id: str = Field(..., description="Reference to EVRequest ID")
+    port_id: Literal["port_1", "port_2"] = Field(..., description="Assigned charging port")
+    start_time: str = Field(..., description="ISO 8601 datetime start")
+    end_time: str = Field(..., description="ISO 8601 datetime end")
+    status: Literal["scheduled", "charging", "completed", "moved", "cancelled"] = Field(
+        default="scheduled"
+    )
+    price_estimate: float = Field(..., description="Estimated cost in currency units")
+    green_score: float = Field(..., ge=0, le=100, description="Greenness score 0-100")
+    co2_estimate_kg: float = Field(..., description="Estimated CO2 footprint in kg")
+    reason: str = Field(..., description="Human-readable explanation of why this window was selected")
+    version: int = Field(default=1, description="Version counter incremented on rescheduling")
 
 
-class PortModel(BaseModel):
-    id: PortId
-    status: PortStatus = "idle"
-    power_limit_kw: float = 50.0
-    current_session_id: Optional[str] = None
+class Port(BaseModel):
+    id: Literal["port_1", "port_2"] = Field(...)
+    status: Literal["idle", "occupied"] = Field(default="idle")
+    power_limit_kw: float = Field(default=50.0, description="Port max output power in kW")
+    current_session_id: Optional[str] = Field(default=None)
 
 
-class RenewableSignalModel(BaseModel):
-    timestamp: str
-    solar_irradiance: float
-    wind_speed: float
-    temperature: float
-    renewable_score: float
-    price_signal: float
-    carbon_intensity: float
+class RenewableSignal(BaseModel):
+    timestamp: str = Field(..., description="ISO 8601 hourly timestamp")
+    solar_irradiance: float = Field(..., description="Solar irradiance W/m²")
+    wind_speed: float = Field(..., description="Wind speed m/s")
+    temperature: float = Field(..., description="Temperature in °C")
+    renewable_score: float = Field(..., ge=0, le=100, description="Derived renewable availability score 0-100")
+    price_signal: float = Field(..., description="Relative electricity price index")
+    carbon_intensity: float = Field(..., description="Relative grid carbon intensity index")
+
+
+class TimeWindow(BaseModel):
+    start: str = Field(..., description="ISO 8601 start")
+    end: str = Field(..., description="ISO 8601 end")
 
 
 class PlanChangedEvent(BaseModel):
     type: Literal["plan_changed"] = "plan_changed"
     session_id: str
-    old_window: dict  # {"start": str, "end": str}
-    new_window: dict  # {"start": str, "end": str}
+    old_window: TimeWindow
+    new_window: TimeWindow
     reason: str
     timestamp: str
 
 
-class RenewableDropRequest(BaseModel):
-    new_score: float = Field(54.0, ge=0.0, le=100.0)
+class SessionUpdateMessage(BaseModel):
+    type: Literal["session_update"] = "session_update"
+    session: Session
 
 
 class StationState(BaseModel):
-    ports: List[PortModel]
-    active_sessions: List[SessionModel]
-    pending_requests: List[EVRequestModel]
-    current_signal: RenewableSignalModel
+    ports: list[Port]
+    active_sessions: list[Session]
+    pending_requests: list[EVRequest]
+    current_signal: RenewableSignal
+
+
+class RenewableDropPayload(BaseModel):
+    new_score: float = Field(..., ge=0, le=100, description="New renewable score after drop event")
+
+
+class GenericOkResponse(BaseModel):
+    ok: bool = True
