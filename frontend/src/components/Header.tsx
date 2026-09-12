@@ -5,15 +5,11 @@ import { TubelightNavbar, NavItem } from './ui/tubelight-navbar';
 interface HeaderProps {
   activeView: 'landing' | 'driver' | 'operator';
   setActiveView: (view: 'landing' | 'driver' | 'operator') => void;
-  solarPct?: number;
-  windPct?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeView,
-  setActiveView,
-  solarPct = 52,
-  windPct = 32
+  setActiveView
 }) => {
   const navItems: NavItem[] = [
     { name: 'Driver View', url: '#', icon: Car },
@@ -53,24 +49,8 @@ export const Header: React.FC<HeaderProps> = ({
           onTabChange={handleTabChange}
         />
 
-        {/* Energy Source Breakdown */}
-        <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/[0.05] backdrop-blur-md border border-white/10">
-          <span className="font-body text-xs text-paper-muted">Energy mix:</span>
-          
-          {/* Stacked Mini Bar */}
-          <div className="w-20 h-2.5 rounded-full bg-white/10 overflow-hidden flex">
-            <div className="h-full bg-solar" style={{ width: `${solarPct}%` }} title={`Solar: ${solarPct}%`}></div>
-            <div className="h-full bg-wind" style={{ width: `${windPct}%` }} title={`Wind: ${windPct}%`}></div>
-          </div>
-
-          <div className="flex items-center gap-2 font-body text-xs font-bold">
-            <span className="text-solar">{solarPct}% solar</span>
-            <span className="text-paper-muted font-normal">+</span>
-            <span className="text-wind">{windPct}% wind</span>
-          </div>
-        </div>
-
       </div>
     </header>
   );
 };
+

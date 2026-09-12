@@ -60,6 +60,7 @@ export interface PlanChangedEvent {
 export interface StationState {
   ports: Port[];
   active_sessions: Session[];
-  pending_requests: EVRequest[];
+  pending_requests?: EVRequest[];
   current_signal: RenewableSignal;
 }
+

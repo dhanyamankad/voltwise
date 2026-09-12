@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
@@ -52,6 +53,8 @@ def _get_active_signals(city: str = "ahmedabad", hours_ahead: int = 24) -> list[
 
 
 router = APIRouter(prefix="/api")
+_scheduling_lock = asyncio.Lock()
+
 
 
 @router.post("/ev-requests", response_model=Session, status_code=201)
@@ -81,33 +84,34 @@ async def create_ev_request(req_in: EVRequestCreate):
         created_at=req_in.created_at or now_iso
     )
 
-    # Fetch current ports, active sessions, and weather signal
-    ports = db.get_ports()
-    active_sessions = db.get_active_sessions()
-    signal = _get_active_signals()
-    
-    # Run real scheduler engine with existing active sessions for conflict-free multi-port allocation
-    raw_sessions = build_schedule([ev_req], ports, signal, existing_sessions=active_sessions)
-    if not raw_sessions:
-        # Deliberately NOT persisted: the driver is told this request failed, so it must not
-        # linger as an unresolvable "ghost" entry in the operator's pending-requests queue.
-        raise HTTPException(
-            status_code=400,
-            detail="Could not allocate charging slot: hard constraints (deadline/capacity) violated"
-        )
+    # Fetch current ports, active sessions, and weather signal under scheduling lock
+    async with _scheduling_lock:
+        ports = db.get_ports()
+        active_sessions = db.get_active_sessions()
+        signal = _get_active_signals()
+        
+        # Run real scheduler engine with existing active sessions for conflict-free multi-port allocation
+        raw_sessions = build_schedule([ev_req], ports, signal, existing_sessions=active_sessions)
+        if not raw_sessions:
+            # Deliberately NOT persisted: the driver is told this request failed, so it must not
+            # linger as an unresolvable "ghost" entry in the operator's pending-requests queue.
+            raise HTTPException(
+                status_code=400,
+                detail="Could not allocate charging slot: hard constraints (deadline/capacity) violated"
+            )
 
-    # Only persist the request once scheduling has actually succeeded.
-    db.save_ev_request(ev_req)
+        # Only persist the request once scheduling has actually succeeded.
+        db.save_ev_request(ev_req)
 
-    session = _to_pydantic_session(raw_sessions[0])
-    db.save_session(session)
-    
-    # Update port status in DB to occupied with current_session_id
-    target_port = next((p for p in ports if p.id == session.port_id), None)
-    if target_port:
-        target_port.status = "occupied"
-        target_port.current_session_id = session.id
-        db.update_port(target_port)
+        session = _to_pydantic_session(raw_sessions[0])
+        db.save_session(session)
+        
+        # Update port status in DB to occupied with current_session_id
+        target_port = next((p for p in ports if p.id == session.port_id), None)
+        if target_port:
+            target_port.status = "occupied"
+            target_port.current_session_id = session.id
+            db.update_port(target_port)
     
     # Broadcast session_update over WebSocket
     await manager.broadcast_json({
@@ -116,6 +120,17 @@ async def create_ev_request(req_in: EVRequestCreate):
     })
     
     return session
+
+
+@router.post("/reset", response_model=GenericOkResponse)
+async def reset_station_data():
+    """
+    Resets/clears all EV requests and charging session history from local database.
+    """
+    db.clear_db()
+    # Broadcast session reset to WebSocket clients
+    await manager.broadcast_json({"type": "station_reset"})
+    return GenericOkResponse(ok=True)
 
 
 @router.get("/sessions/{session_id}", response_model=Session)
@@ -133,11 +148,10 @@ async def get_session(session_id: str):
 async def get_schedule():
     """
     Returns full station state snapshot: ports, active sessions,
-    pending requests, and current renewable signal.
+    and current renewable signal.
     """
     active_sessions = db.get_active_sessions()
     ports = db.get_ports_with_live_status(active_sessions)
-    pending_requests = db.get_pending_ev_requests()
     signals = _get_active_signals()
     current_signal = signals[0] if signals else RenewableSignal(
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -152,9 +166,10 @@ async def get_schedule():
     return StationState(
         ports=ports,
         active_sessions=active_sessions,
-        pending_requests=pending_requests,
+        pending_requests=[],
         current_signal=current_signal
     )
+
 
 
 @router.get("/schedule/queues")

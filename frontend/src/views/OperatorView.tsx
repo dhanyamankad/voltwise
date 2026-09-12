@@ -505,61 +505,12 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
 
       </div>
 
-      {/* SECTION 2: QUEUE & 24H SIGNAL FORECAST */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start font-sans">
+      {/* SECTION 2: 24H SIGNAL FORECAST */}
+      <div className="grid grid-cols-1 gap-6 items-start font-sans">
         
-        {/* PENDING DISPATCH QUEUE (UNASSIGNED) */}
-        <div className="lg:col-span-5 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 font-sans">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
-            <h2 className="font-display text-base font-bold text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-cyan-400 text-lg">queue</span>
-              Unassigned Dispatch Queue
-            </h2>
-            <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-sans text-xs font-semibold">
-              {stationState?.pending_requests.length || 0} Waiting
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-3 font-sans min-h-[160px]">
-            {stationState?.pending_requests && stationState.pending_requests.length > 0 ? (
-              stationState.pending_requests.map((req, idx) => (
-                <div 
-                  key={req.id || idx}
-                  className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex flex-col gap-2.5 shadow-sm hover:border-white/20 transition-all font-sans"
-                >
-                  <div className="flex items-center justify-between font-sans">
-                    <span className="font-sans text-xs font-bold text-white font-mono">
-                      {req.id || `req_${idx}`}
-                    </span>
-                    {req.vehicle_class === 'priority' ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-alert-priority/20 text-alert-priority font-sans text-[11px] font-bold border border-alert-priority/40">
-                        Priority EV
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-sans text-[11px] font-medium">
-                        Standard EV
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs font-sans text-slate-400 pt-1">
-                    <span>SOC: <strong className="text-cyan-400 font-bold">{req.current_soc}%</strong> → <strong className="text-solar font-bold">{req.target_soc}%</strong></span>
-                    <span>Deadline: <strong className="text-white">{formatDisplayTime(req.deadline)}</strong></span>
-                    <span className="text-solar font-semibold capitalize">{req.preference}</span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 flex flex-col items-center justify-center text-center gap-2 text-slate-400 text-xs my-auto">
-                <span className="material-symbols-outlined text-2xl text-slate-500">check_circle</span>
-                <span>No pending unassigned requests. All vehicles allocated.</span>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* 24-HOUR RENEWABLE SIGNAL GRAPH (Plotted dynamically from signalData) */}
-        <div className="lg:col-span-7 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 font-sans">
+        <div className="flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 font-sans">
+
           <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
             <h2 className="font-display text-base font-bold text-white flex items-center gap-2">
               <span className="material-symbols-outlined text-solar text-lg">insights</span>

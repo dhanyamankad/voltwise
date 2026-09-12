@@ -73,6 +73,18 @@ def init_db():
         conn.commit()
 
 
+def clear_db():
+    """
+    Clears all EV requests and charging sessions, resetting port statuses to idle.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions")
+        cursor.execute("DELETE FROM ev_requests")
+        cursor.execute("UPDATE ports SET status = 'idle', current_session_id = NULL")
+        conn.commit()
+
+
 def get_ports() -> list[Port]:
     with get_connection() as conn:
         cursor = conn.cursor()

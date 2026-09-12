@@ -1,6 +1,6 @@
 import os
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 # Use a temporary test database
@@ -204,6 +204,7 @@ def test_port_returns_to_idle_after_session_ends(client):
     from backend.app.models import EVRequest as DbEVRequest, Session as DbSession
     from datetime import timezone
 
+    db.clear_db()
     now = datetime.now(timezone.utc)
     req = DbEVRequest(
         id="ev_finished", vehicle_class="normal", current_soc=20.0, target_soc=80.0,
@@ -232,8 +233,14 @@ def test_port_returns_to_idle_after_session_ends(client):
 
 
 def test_rejected_request_does_not_leak_into_pending_queue(client):
-    from datetime import timezone
+    """
+    Regression test: an EV request the scheduler cannot satisfy must not be persisted, since
+    the driver already received a 400 error — otherwise it lingers forever as an unresolvable
+    "ghost" entry in the operator's pending-requests queue.
+    """
+    db.clear_db()
     deadline = (datetime.now(timezone.utc) + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     response = client.post("/api/ev-requests", json={
         "vehicle_class": "normal",
         "current_soc": 10.0,
@@ -246,3 +253,4 @@ def test_rejected_request_does_not_leak_into_pending_queue(client):
 
     schedule = client.get("/api/schedule").json()
     assert schedule["pending_requests"] == []
+

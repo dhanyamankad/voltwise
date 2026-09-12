@@ -78,8 +78,9 @@ class SessionUpdateMessage(BaseModel):
 class StationState(BaseModel):
     ports: list[Port]
     active_sessions: list[Session]
-    pending_requests: list[EVRequest]
+    pending_requests: list[EVRequest] = []
     current_signal: RenewableSignal
+
 
 
 class RenewableDropPayload(BaseModel):

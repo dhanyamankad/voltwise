@@ -591,19 +591,9 @@ export const DriverView: React.FC = () => {
                     <span className="font-sans text-[11px] text-slate-400">-66% vs baseline grid</span>
                   </div>
                 </div>
-
-                {/* Plain-English Reason */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 flex items-start gap-3 font-sans">
-                  <span className="material-symbols-outlined text-amber-400 text-xl mt-0.5 shrink-0">info</span>
-                  <div className="flex flex-col gap-1 font-sans">
-                    <span className="font-sans text-xs font-bold text-white">Allocation Reason</span>
-                    <p className="font-sans text-xs text-slate-300 leading-relaxed">
-                      {recommendation.reason}
-                    </p>
-                  </div>
-                </div>
               </motion.div>
             </AnimatePresence>
+
           ) : (
             <div className="py-16 px-6 sm:px-10 rounded-2xl bg-white/[0.02] border border-dashed border-white/15 flex flex-col items-center justify-center text-center gap-5 font-sans my-auto min-h-[320px]">
               <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
