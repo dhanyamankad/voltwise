@@ -99,6 +99,13 @@ async def create_ev_request(req_in: EVRequestCreate):
     session = _to_pydantic_session(raw_sessions[0])
     db.save_session(session)
     
+    # Update port status in DB to occupied with current_session_id
+    target_port = next((p for p in ports if p.id == session.port_id), None)
+    if target_port:
+        target_port.status = "occupied"
+        target_port.current_session_id = session.id
+        db.update_port(target_port)
+    
     # Broadcast session_update over WebSocket
     await manager.broadcast_json({
         "type": "session_update",
@@ -173,12 +180,13 @@ async def simulate_renewable_drop(payload: RenewableDropPayload):
     
     # 2. Re-optimize active sessions
     active_sessions = db.get_active_sessions()
+    ev_requests_map = {r.id: r for r in db.get_ev_requests()}
     
     # Store old windows before mutation
     old_windows = {s.id: (s.start_time, s.end_time) for s in active_sessions}
     
     sched_sessions = [SchedulerSession(**s.model_dump()) for s in active_sessions]
-    raw_changed = reoptimize(sched_sessions, updated_signal)
+    raw_changed = reoptimize(sched_sessions, updated_signal, requests_map=ev_requests_map)
     
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     for raw in raw_changed:

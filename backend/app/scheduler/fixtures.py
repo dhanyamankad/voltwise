@@ -11,6 +11,11 @@ from typing import List, Tuple
 from .models import EVRequest, Port, RenewableSignal
 
 
+from datetime import datetime, timedelta
+from typing import List, Tuple
+from .models import EVRequest, Port, RenewableSignal
+
+
 def get_default_ports() -> List[Port]:
     """Returns standard 2-port station configuration."""
     return [
@@ -21,14 +26,14 @@ def get_default_ports() -> List[Port]:
 
 def get_renewable_signal_baseline() -> List[RenewableSignal]:
     """
-    Returns 24-hour renewable signal profile.
-    Peak solar/renewable availability around 12:00 - 16:00.
+    Returns 24-hour renewable signal profile starting from current UTC hour.
+    Peak solar/renewable availability around 12:00 - 16:00 in profile.
     """
     signals = []
-    base_date = "2026-09-12"
+    now_utc = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
 
     hourly_profiles = [
-        # (hour, renewable_score, price_signal, carbon_intensity)
+        # (hour_offset, renewable_score, price_signal, carbon_intensity)
         (0, 30.0, 8.0, 350.0),
         (1, 28.0, 7.5, 360.0),
         (2, 25.0, 7.0, 380.0),
@@ -56,7 +61,8 @@ def get_renewable_signal_baseline() -> List[RenewableSignal]:
     ]
 
     for hr, green, price, carbon in hourly_profiles:
-        timestamp_str = f"{base_date}T{hr:02d}:00:00Z"
+        dt = now_utc + timedelta(hours=hr)
+        timestamp_str = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         signals.append(
             RenewableSignal(
                 timestamp=timestamp_str,
@@ -74,12 +80,12 @@ def get_renewable_signal_baseline() -> List[RenewableSignal]:
 
 def get_renewable_signal_drop() -> List[RenewableSignal]:
     """
-    Simulates a sudden cloud cover/drop at 1:30 PM (13:30),
-    dropping renewable score from 90% down to 54% between 13:00 and 16:00.
+    Simulates a sudden cloud cover/drop in the active near window,
+    dropping renewable score from peak down to 54%.
     """
     signals = get_renewable_signal_baseline()
-    for s in signals:
-        if "T13:00:00" in s.timestamp or "T14:00:00" in s.timestamp or "T15:00:00" in s.timestamp:
+    for idx, s in enumerate(signals):
+        if 1 <= idx <= 4:
             s.renewable_score = 54.0
             s.price_signal = 12.0
             s.carbon_intensity = 240.0
@@ -88,36 +94,38 @@ def get_renewable_signal_drop() -> List[RenewableSignal]:
 
 def scenario_three_normal_evs() -> Tuple[List[EVRequest], List[Port], List[RenewableSignal]]:
     """Scenario 1: 3 normal EVs competing for 2 ports."""
+    now_utc = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    created_str = (now_utc - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     reqs = [
         EVRequest(
             id="EV-A",
             vehicle_class="normal",
             current_soc=20.0,
             target_soc=80.0,
-            deadline="2026-09-12T18:00:00Z",
+            deadline=(now_utc + timedelta(hours=10)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             charging_rate_kw=50.0,
             preference="greenest",
-            created_at="2026-09-12T08:00:00Z"
+            created_at=created_str
         ),
         EVRequest(
             id="EV-B",
             vehicle_class="normal",
             current_soc=30.0,
             target_soc=90.0,
-            deadline="2026-09-12T19:00:00Z",
+            deadline=(now_utc + timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             charging_rate_kw=50.0,
             preference="cheapest",
-            created_at="2026-09-12T08:30:00Z"
+            created_at=created_str
         ),
         EVRequest(
             id="EV-D",
             vehicle_class="normal",
             current_soc=10.0,
             target_soc=70.0,
-            deadline="2026-09-12T16:00:00Z",
+            deadline=(now_utc + timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             charging_rate_kw=50.0,
             preference="balanced",
-            created_at="2026-09-12T09:00:00Z"
+            created_at=created_str
         ),
     ]
     return reqs, get_default_ports(), get_renewable_signal_baseline()
@@ -125,36 +133,39 @@ def scenario_three_normal_evs() -> Tuple[List[EVRequest], List[Port], List[Renew
 
 def scenario_priority_ambulance() -> Tuple[List[EVRequest], List[Port], List[RenewableSignal]]:
     """Scenario 2: 1 Priority Ambulance + 2 Normal EVs."""
+    now_utc = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    created_str = (now_utc - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     reqs = [
         EVRequest(
             id="EV-A",
             vehicle_class="normal",
             current_soc=20.0,
             target_soc=80.0,
-            deadline="2026-09-12T18:00:00Z",
+            deadline=(now_utc + timedelta(hours=10)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             charging_rate_kw=50.0,
             preference="greenest",
-            created_at="2026-09-12T08:00:00Z"
+            created_at=created_str
         ),
         EVRequest(
             id="EV-C",
             vehicle_class="priority",  # Ambulance / Emergency Vehicle
             current_soc=15.0,
             target_soc=95.0,
-            deadline="2026-09-12T12:00:00Z",
+            deadline=(now_utc + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             charging_rate_kw=50.0,
             preference="balanced",
-            created_at="2026-09-12T08:00:00Z"
+            created_at=created_str
         ),
         EVRequest(
             id="EV-B",
             vehicle_class="normal",
             current_soc=40.0,
             target_soc=80.0,
-            deadline="2026-09-12T20:00:00Z",
+            deadline=(now_utc + timedelta(hours=12)).strftime("%Y-%m-%dT%H:%M:%SZ"),
             charging_rate_kw=50.0,
             preference="cheapest",
-            created_at="2026-09-12T09:00:00Z"
+            created_at=created_str
         ),
     ]
     return reqs, get_default_ports(), get_renewable_signal_baseline()
+

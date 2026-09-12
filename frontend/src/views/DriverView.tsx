@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EVRequest, Session, VehicleClass, Preference } from '../types';
+import { EVRequest, Session, VehicleClass, Preference, RenewableSignal } from '../types';
 import { submitEVRequest, fetchSchedule } from '../api/client';
+import { formatDisplayTime, calculateRenewableBreakdown } from '../lib/utils';
 
 // Arc Gauge Component for Battery SOC (Round Cell Energy Gauge with Inter Font)
 const ArcGauge: React.FC<{
@@ -76,21 +77,6 @@ const ArcGauge: React.FC<{
   );
 };
 
-function formatDisplayTime(timeStr?: string): string {
-  if (!timeStr) return '';
-  if (timeStr.includes('T') || timeStr.includes('Z')) {
-    const d = new Date(timeStr);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-    }
-  }
-  return timeStr;
-}
-
 function formatDateTimeLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const year = d.getFullYear();
@@ -106,6 +92,7 @@ export const DriverView: React.FC = () => {
   const [currentSoc, setCurrentSoc] = useState<number>(25);
   const [targetSoc, setTargetSoc] = useState<number>(80);
   const [currentClock, setCurrentClock] = useState<Date>(new Date());
+  const [liveSignal, setLiveSignal] = useState<RenewableSignal | undefined>(undefined);
   
   // Default deadline: 2 hours in the future
   const [deadline, setDeadline] = useState<string>(() => {
@@ -124,9 +111,11 @@ export const DriverView: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch initial station grid signal state on mount
   useEffect(() => {
-    // Initial load: keep recommendation null so driver sees empty standby guidance state
-    setRecommendation(null);
+    fetchSchedule()
+      .then((st) => setLiveSignal(st.current_signal))
+      .catch((err) => console.warn('[DriverView] Live signal fetch failed, using fallback:', err));
   }, []);
 
   // Validation rules
@@ -167,10 +156,9 @@ export const DriverView: React.FC = () => {
     }
   };
 
-  // Solar vs Wind breakdown split for Green Score
-  const solarScore = recommendation ? Math.round(recommendation.green_score * 0.6) : 52;
-  const windScore = recommendation ? recommendation.green_score - solarScore : 32;
-  const gridScore = recommendation ? 100 - recommendation.green_score : 16;
+  // Data-driven solar vs wind breakdown split calculated from real renewable signals
+  const activeGreenScore = recommendation ? recommendation.green_score : (liveSignal?.renewable_score ?? 84);
+  const { solarScore, windScore, gridScore } = calculateRenewableBreakdown(activeGreenScore, liveSignal);
 
   return (
     <div className="flex flex-col gap-8 w-full text-slate-100 font-sans">

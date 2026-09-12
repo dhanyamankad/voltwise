@@ -16,6 +16,7 @@ from .constraints import (
     calculate_charging_duration_hours,
     is_port_available,
     is_deadline_respected,
+    is_session_locked,
     DEFAULT_BATTERY_CAPACITY_KWH,
 )
 from .reasons import generate_schedule_reason, generate_reoptimization_reason
@@ -232,6 +233,7 @@ def build_schedule(
 def reoptimize(
     current_sessions: List[Session],
     updated_signal: List[RenewableSignal],
+    requests_map: Optional[Dict[str, EVRequest]] = None,
 ) -> List[Session]:
     """
     Re-evaluates flexible sessions when energy signals change.
@@ -244,11 +246,12 @@ def reoptimize(
     changed_sessions: List[Session] = []
     working_sessions = list(current_sessions)  # Dynamic working copy to prevent slot overlaps
 
+    req_map = requests_map or {}
     base_start = min(parse_iso_datetime(s.timestamp) for s in updated_signal)
 
     for session in working_sessions:
-        # Hard constraint: Priority sessions or active/completed are untouched
-        if session.status in ("charging", "completed", "cancelled"):
+        # Hard constraint: Priority sessions or active/completed are untouched (uses is_session_locked)
+        if is_session_locked(session, req_map):
             continue
 
         if "Priority vehicle" in session.reason or "protected" in session.reason.lower():
