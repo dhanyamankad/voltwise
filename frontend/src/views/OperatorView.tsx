@@ -68,8 +68,12 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
   const port1 = stationState?.ports.find((p) => p.id === 'port_1');
   const port2 = stationState?.ports.find((p) => p.id === 'port_2');
 
-  const session1 = stationState?.active_sessions.find((s) => s.port_id === 'port_1');
-  const session2 = stationState?.active_sessions.find((s) => s.port_id === 'port_2');
+  // Select the most recent active session for each port
+  const port1Sessions = stationState?.active_sessions.filter((s) => s.port_id === 'port_1') || [];
+  const session1 = port1Sessions.length > 0 ? port1Sessions[port1Sessions.length - 1] : null;
+
+  const port2Sessions = stationState?.active_sessions.filter((s) => s.port_id === 'port_2') || [];
+  const session2 = port2Sessions.length > 0 ? port2Sessions[port2Sessions.length - 1] : null;
 
   const renewablePct = stationState?.current_signal.renewable_score || 84;
   const solarPct = Math.round(renewablePct * 0.6);
@@ -333,7 +337,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
 
                 <div className="flex items-center justify-between text-xs font-sans text-slate-400 pt-1">
                   <span>SOC: <strong className="text-cyan-400 font-bold">{req.current_soc}%</strong> → <strong className="text-amber-400 font-bold">{req.target_soc}%</strong></span>
-                  <span>Deadline: <strong className="text-white">{req.deadline}</strong></span>
+                  <span>Deadline: <strong className="text-white">{formatDisplayTime(req.deadline)}</strong></span>
                   <span className="text-amber-400 font-semibold capitalize">{req.preference}</span>
                 </div>
               </div>

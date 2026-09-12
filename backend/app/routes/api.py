@@ -64,10 +64,10 @@ async def create_ev_request(req_in: EVRequestCreate):
     ev_id = f"ev_{uuid.uuid4().hex[:8]}"
     
     # Validate SOC Range
-    if req_in.current_soc > req_in.target_soc:
+    if req_in.current_soc >= req_in.target_soc:
         raise HTTPException(
             status_code=400,
-            detail="Invalid SOC Range: Current SOC cannot be greater than Target SOC."
+            detail="Invalid SOC Range: Target SOC must be strictly greater than Current SOC."
         )
 
     ev_req = EVRequest(
@@ -127,7 +127,7 @@ async def get_schedule():
     """
     ports = db.get_ports()
     active_sessions = db.get_active_sessions()
-    pending_requests = db.get_ev_requests()
+    pending_requests = db.get_pending_ev_requests()
     signals = _get_active_signals()
     current_signal = signals[0] if signals else RenewableSignal(
         timestamp=datetime.now().isoformat(),

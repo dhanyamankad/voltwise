@@ -91,64 +91,77 @@ function formatDisplayTime(timeStr?: string): string {
   return timeStr;
 }
 
+function formatDateTimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const year = d.getFullYear();
+  const month = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const hours = pad(d.getHours());
+  const minutes = pad(d.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 export const DriverView: React.FC = () => {
   const [vehicleClass, setVehicleClass] = useState<VehicleClass>('normal');
   const [currentSoc, setCurrentSoc] = useState<number>(25);
   const [targetSoc, setTargetSoc] = useState<number>(80);
-  const [deadline, setDeadline] = useState<string>('5:30 PM');
+  const [currentClock, setCurrentClock] = useState<Date>(new Date());
+  
+  // Default deadline: 2 hours in the future
+  const [deadline, setDeadline] = useState<string>(() => {
+    return formatDateTimeLocal(new Date(Date.now() + 2 * 3600 * 1000));
+  });
+
   const [chargingRateKw, setChargingRateKw] = useState<number>(50);
   const [preference, setPreference] = useState<Preference>('greenest');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [recommendation, setRecommendation] = useState<Session | null>(null);
+
+  // Ticking live IST clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentClock(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     // Initial load: keep recommendation null so driver sees empty standby guidance state
     setRecommendation(null);
   }, []);
 
-  const isInvalidSoc = currentSoc > targetSoc;
+  // Validation rules
+  const isInvalidSoc = currentSoc >= targetSoc;
+  const isInvalidRate = isNaN(chargingRateKw) || chargingRateKw < 1 || chargingRateKw > 350;
+  
+  const selectedDeadlineDt = deadline ? new Date(deadline) : null;
+  const isDeadlinePast = !selectedDeadlineDt || isNaN(selectedDeadlineDt.getTime()) || selectedDeadlineDt.getTime() <= currentClock.getTime();
 
-function parseTimeToFutureISO(timeStr: string): string {
-  const now = new Date();
-  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-  if (match) {
-    let hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const ampm = match[3]?.toUpperCase();
-
-    if (ampm === 'PM' && hours < 12) hours += 12;
-    if (ampm === 'AM' && hours === 12) hours = 0;
-
-    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
-    if (targetDate.getTime() <= now.getTime()) {
-      targetDate.setDate(targetDate.getDate() + 1);
-    }
-    return targetDate.toISOString();
-  }
-  return new Date(now.getTime() + 6 * 3600 * 1000).toISOString();
-}
+  const isFormInvalid = isInvalidSoc || isInvalidRate || isDeadlinePast;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isInvalidSoc) return;
+    if (isFormInvalid) return;
 
     setIsLoading(true);
+    setErrorMessage(null);
     try {
-      const futureDeadline = parseTimeToFutureISO(deadline);
+      const isoDeadline = new Date(deadline).toISOString();
 
       const requestData: EVRequest = {
         vehicle_class: vehicleClass,
         current_soc: currentSoc,
         target_soc: targetSoc,
-        deadline: futureDeadline,
+        deadline: isoDeadline,
         charging_rate_kw: chargingRateKw,
         preference
       };
       const result = await submitEVRequest(requestData);
       setRecommendation(result);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting EV request:', err);
+      setErrorMessage(
+        err?.message || 'Unable to schedule charging window. Please check your inputs or choose a later deadline.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -290,15 +303,49 @@ function parseTimeToFutureISO(timeStr: string): string {
             </div>
           </div>
 
-          {/* Validation Alert Banner */}
+          {/* Validation Alert Banners */}
           {isInvalidSoc && (
             <div className="p-4 rounded-2xl bg-red-500/20 border border-red-500/50 text-red-200 flex items-start gap-3 font-sans text-xs shadow-md animate-shake">
               <span className="material-symbols-outlined text-red-400 text-xl shrink-0 mt-0.5">error</span>
               <div className="flex flex-col gap-0.5">
                 <span className="font-bold text-red-100 text-xs">Invalid Battery Goal</span>
                 <p className="leading-relaxed">
-                  Current battery charge (<strong className="text-white">{currentSoc}%</strong>) cannot be greater than target battery charge (<strong className="text-white">{targetSoc}%</strong>). Please adjust your target charge to be higher.
+                  Target SOC (<strong className="text-white">{targetSoc}%</strong>) must be strictly higher than Current SOC (<strong className="text-white">{currentSoc}%</strong>).
                 </p>
+              </div>
+            </div>
+          )}
+
+          {isInvalidRate && (
+            <div className="p-4 rounded-2xl bg-red-500/20 border border-red-500/50 text-red-200 flex items-start gap-3 font-sans text-xs shadow-md">
+              <span className="material-symbols-outlined text-red-400 text-xl shrink-0 mt-0.5">bolt</span>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-red-100 text-xs">Invalid Charging Rate</span>
+                <p className="leading-relaxed">
+                  Max rate must be a valid number between <strong className="text-white">1 kW</strong> and <strong className="text-white">350 kW</strong>.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isDeadlinePast && !isInvalidSoc && !isInvalidRate && (
+            <div className="p-4 rounded-2xl bg-amber-500/20 border border-amber-500/50 text-amber-200 flex items-start gap-3 font-sans text-xs shadow-md">
+              <span className="material-symbols-outlined text-amber-400 text-xl shrink-0 mt-0.5">schedule</span>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-amber-100 text-xs">Invalid Ready-by Deadline</span>
+                <p className="leading-relaxed">
+                  Selected deadline must be in the future relative to current time.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="p-4 rounded-2xl bg-red-500/20 border border-red-500/50 text-red-200 flex items-start gap-3 font-sans text-xs shadow-md">
+              <span className="material-symbols-outlined text-red-400 text-xl shrink-0 mt-0.5">warning</span>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-red-100 text-xs">Scheduling Error</span>
+                <p className="leading-relaxed">{errorMessage}</p>
               </div>
             </div>
           )}
@@ -324,28 +371,47 @@ function parseTimeToFutureISO(timeStr: string): string {
           </div>
 
           {/* Deadline & Charging Rate Inputs */}
-          <div className="grid grid-cols-2 gap-4 font-sans">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans">
             <div className="flex flex-col gap-1.5 font-sans">
-              <label className="font-sans text-xs font-medium text-slate-400">Ready-by Deadline</label>
+              <div className="flex items-center justify-between">
+                <label className="font-sans text-xs font-medium text-slate-400">Ready-by Deadline</label>
+                <span className="font-sans text-[11px] font-semibold text-cyan-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                  IST: {currentClock.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                </span>
+              </div>
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 text-white hover:border-white/20 transition-all font-sans">
-                <span className="material-symbols-outlined text-amber-400 text-xl">schedule</span>
+                <span className="material-symbols-outlined text-amber-400 text-xl">event</span>
                 <input
-                  type="text"
+                  type="datetime-local"
                   value={deadline}
-                  onChange={(e) => setDeadline(e.target.value)}
-                  className="bg-transparent font-sans text-sm font-bold w-full focus:outline-none text-white"
+                  min={formatDateTimeLocal(currentClock)}
+                  onChange={(e) => {
+                    setDeadline(e.target.value);
+                    setErrorMessage(null);
+                  }}
+                  className="bg-transparent font-sans text-xs sm:text-sm font-bold w-full focus:outline-none text-white cursor-pointer color-scheme-dark"
                 />
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5 font-sans">
-              <label className="font-sans text-xs font-medium text-slate-400">Max Rate (kW)</label>
+              <div className="flex items-center justify-between">
+                <label className="font-sans text-xs font-medium text-slate-400">Max Rate (kW)</label>
+                <span className="font-sans text-[10px] text-slate-500 font-medium">1 – 350 kW</span>
+              </div>
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 text-white hover:border-white/20 transition-all font-sans">
                 <span className="material-symbols-outlined text-cyan-400 text-xl">bolt</span>
                 <input
                   type="number"
+                  min={1}
+                  max={350}
+                  step={1}
                   value={chargingRateKw}
-                  onChange={(e) => setChargingRateKw(Number(e.target.value))}
+                  onChange={(e) => {
+                    setChargingRateKw(Number(e.target.value));
+                    setErrorMessage(null);
+                  }}
                   className="bg-transparent font-sans text-sm font-bold w-full focus:outline-none text-white"
                 />
               </div>
@@ -403,24 +469,28 @@ function parseTimeToFutureISO(timeStr: string): string {
             </div>
           </div>
 
-          {/* Submit Action (Disabled when isInvalidSoc is true) */}
+          {/* Submit Action */}
           <button
             type="submit"
-            disabled={isLoading || isInvalidSoc}
+            disabled={isLoading || isFormInvalid}
             className={`w-full py-4 px-6 rounded-2xl font-sans text-sm font-bold flex items-center justify-center gap-2 transition-all mt-2 ${
-              isInvalidSoc
-                ? 'bg-slate-800/80 text-slate-500 border border-red-500/30 cursor-not-allowed'
+              isFormInvalid
+                ? 'bg-slate-800/80 text-slate-500 border border-white/10 cursor-not-allowed'
                 : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 cursor-pointer disabled:opacity-50'
             }`}
           >
             <span className="material-symbols-outlined text-lg">
-              {isLoading ? 'sync' : isInvalidSoc ? 'block' : 'bolt'}
+              {isLoading ? 'sync' : isFormInvalid ? 'block' : 'bolt'}
             </span>
             <span>
               {isLoading
                 ? 'Calculating Optimal Schedule...'
                 : isInvalidSoc
-                ? 'Invalid Battery Goal (Current > Target)'
+                ? 'Invalid Battery Goal (Target <= Current)'
+                : isInvalidRate
+                ? 'Invalid Rate (Must be 1-350 kW)'
+                : isDeadlinePast
+                ? 'Invalid Deadline (Must be in future)'
                 : 'Request Clean Schedule'}
             </span>
           </button>
@@ -475,7 +545,7 @@ function parseTimeToFutureISO(timeStr: string): string {
                     </div>
 
                     <span className="font-sans text-xs text-slate-300 relative z-10 pt-1 leading-relaxed">
-                      Synced with peak <strong className="text-amber-400">{solarScore}% Solar</strong> & <strong className="text-cyan-400">{windScore}% Wind</strong> clean generation before your {deadline} deadline.
+                      Synced with peak <strong className="text-amber-400">{solarScore}% Solar</strong> & <strong className="text-cyan-400">{windScore}% Wind</strong> clean generation before your <strong className="text-white">{formatDisplayTime(deadline)}</strong> deadline.
                     </span>
                   </div>
                 </div>

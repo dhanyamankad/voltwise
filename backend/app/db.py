@@ -146,6 +146,31 @@ def get_ev_requests() -> list[EVRequest]:
         ]
 
 
+def get_pending_ev_requests() -> list[EVRequest]:
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM ev_requests 
+            WHERE id NOT IN (SELECT ev_id FROM sessions)
+            ORDER BY created_at DESC
+        """)
+        rows = cursor.fetchall()
+        return [
+            EVRequest(
+                id=row["id"],
+                vehicle_class=row["vehicle_class"],
+                current_soc=row["current_soc"],
+                target_soc=row["target_soc"],
+                deadline=row["deadline"],
+                charging_rate_kw=row["charging_rate_kw"],
+                preference=row["preference"],
+                created_at=row["created_at"]
+            )
+            for row in rows
+        ]
+
+
+
 def get_ev_request(req_id: str) -> Optional[EVRequest]:
     with get_connection() as conn:
         cursor = conn.cursor()

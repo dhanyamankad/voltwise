@@ -18,6 +18,21 @@ _ACTIVE_CITY: str = DEFAULT_CITY
 def get_current_signal(city: str = DEFAULT_CITY, force_refresh: bool = False) -> List[Dict[str, Any]]:
     """Retrieves current active renewable signal, initializing if necessary."""
     global _ACTIVE_SIGNAL_CACHE, _ACTIVE_CITY
+    from datetime import datetime, timezone, timedelta
+    
+    now_utc = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    if _ACTIVE_SIGNAL_CACHE and not force_refresh:
+        try:
+            first_ts_str = _ACTIVE_SIGNAL_CACHE[0].get("timestamp", "")
+            cleaned = first_ts_str.replace("Z", "+00:00")
+            first_dt = datetime.fromisoformat(cleaned)
+            if first_dt.tzinfo is not None:
+                first_dt = first_dt.replace(tzinfo=None)
+            if first_dt < now_utc.replace(tzinfo=None) - timedelta(hours=1):
+                force_refresh = True
+        except Exception:
+            force_refresh = True
+
     if _ACTIVE_SIGNAL_CACHE is None or force_refresh or city.lower() != _ACTIVE_CITY.lower():
         _ACTIVE_CITY = city
         _ACTIVE_SIGNAL_CACHE = get_renewable_signal(city=city, hours_ahead=24)

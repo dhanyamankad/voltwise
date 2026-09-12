@@ -131,11 +131,13 @@ def build_schedule(
 
     sorted_requests = priority_reqs + normal_reqs
 
-    # Determine earliest available start time
+    # Determine earliest available start time (must be at or after current UTC time)
+    now_utc = datetime.utcnow()
     if signal:
-        base_start = min(parse_iso_datetime(s.timestamp) for s in signal)
+        min_signal_dt = min(parse_iso_datetime(s.timestamp) for s in signal)
+        base_start = max(now_utc, min_signal_dt)
     else:
-        base_start = datetime.utcnow()
+        base_start = now_utc
 
     for req in sorted_requests:
         created_dt = parse_iso_datetime(req.created_at) if req.created_at else base_start

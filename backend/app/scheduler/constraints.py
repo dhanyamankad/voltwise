@@ -56,7 +56,7 @@ def calculate_charging_duration_hours(
     Duration = Energy Required (kWh) / Effective Charging Rate (kW).
     """
     soc_delta = max(0.0, target_soc - current_soc)
-    if soc_delta == 0.0:
+    if soc_delta <= 0.0:
         return 0.0
 
     energy_required_kwh = (soc_delta / 100.0) * battery_capacity_kwh
@@ -64,7 +64,9 @@ def calculate_charging_duration_hours(
     if effective_rate_kw <= 0:
         effective_rate_kw = 50.0  # Safe fallback
 
-    return energy_required_kwh / effective_rate_kw
+    raw_duration = energy_required_kwh / effective_rate_kw
+    # Enforce minimum charging duration floor of 5 minutes (0.083 hours) for small SOC deltas
+    return max(0.083, raw_duration)
 
 
 def is_port_available(
