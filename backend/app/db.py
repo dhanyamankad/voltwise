@@ -147,6 +147,10 @@ def get_ev_requests() -> list[EVRequest]:
 
 
 def get_pending_ev_requests() -> list[EVRequest]:
+    from datetime import datetime, timezone
+    from backend.app.scheduler.constraints import parse_iso_datetime
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -155,8 +159,9 @@ def get_pending_ev_requests() -> list[EVRequest]:
             ORDER BY created_at DESC
         """)
         rows = cursor.fetchall()
-        return [
-            EVRequest(
+        valid = []
+        for row in rows:
+            req = EVRequest(
                 id=row["id"],
                 vehicle_class=row["vehicle_class"],
                 current_soc=row["current_soc"],
@@ -166,9 +171,10 @@ def get_pending_ev_requests() -> list[EVRequest]:
                 preference=row["preference"],
                 created_at=row["created_at"]
             )
-            for row in rows
-        ]
-
+            # Remove requests whose deadline has already passed
+            if parse_iso_datetime(req.deadline) >= now_utc:
+                valid.append(req)
+        return valid
 
 
 def get_ev_request(req_id: str) -> Optional[EVRequest]:
@@ -266,12 +272,17 @@ def get_all_sessions() -> list[Session]:
 
 
 def get_active_sessions() -> list[Session]:
+    from datetime import datetime, timezone
+    from backend.app.scheduler.constraints import parse_iso_datetime
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM sessions WHERE status IN ('scheduled', 'charging', 'moved') ORDER BY start_time ASC")
         rows = cursor.fetchall()
-        return [
-            Session(
+        active = []
+        for row in rows:
+            sess = Session(
                 id=row["id"],
                 ev_id=row["ev_id"],
                 port_id=row["port_id"],
@@ -284,5 +295,7 @@ def get_active_sessions() -> list[Session]:
                 reason=row["reason"],
                 version=row["version"]
             )
-            for row in rows
-        ]
+            # Filter out sessions whose end_time has already passed (charged/completed)
+            if parse_iso_datetime(sess.end_time) >= now_utc:
+                active.append(sess)
+        return active

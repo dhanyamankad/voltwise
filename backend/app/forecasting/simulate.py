@@ -42,7 +42,7 @@ def get_current_signal(city: str = DEFAULT_CITY, force_refresh: bool = False) ->
 def trigger_renewable_drop(
     new_score: float = 54.0,
     target_hour_offset: int = 0,
-    duration_hours: int = 6
+    duration_hours: int = 2
 ) -> List[Dict[str, Any]]:
     """
     Simulation hook used by demo script and /api/simulate/renewable-drop endpoint.

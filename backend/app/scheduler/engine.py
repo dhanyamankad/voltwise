@@ -85,7 +85,9 @@ def _evaluate_window(
         green_score, price_sig, carbon_intensity = _get_signal_at_time(sample_dt, signals)
 
         total_green += green_score
-        total_price += price_sig * energy_kwh
+        # Scale 0-100 price signal index to realistic rate (₹/kWh, e.g. 60.0 index -> ₹6.00/kWh)
+        price_rate_per_kwh = price_sig / 10.0 if price_sig > 20.0 else price_sig
+        total_price += price_rate_per_kwh * energy_kwh
         total_co2 += (carbon_intensity * energy_kwh) / 1000.0  # g to kg
 
     avg_green = total_green / steps
@@ -94,9 +96,9 @@ def _evaluate_window(
     if preference == "greenest":
         composite_score = avg_green * 2.0 - (total_price * 0.1)
     elif preference == "cheapest":
-        composite_score = (100.0 - total_price * 2.0) + (avg_green * 0.5)
+        composite_score = (100.0 - total_price * 0.2) + (avg_green * 0.5)
     else:  # balanced
-        composite_score = (avg_green * 0.6) + ((100.0 - total_price) * 0.4)
+        composite_score = (avg_green * 0.6) + ((100.0 - total_price * 0.1) * 0.4)
 
     return composite_score, avg_green, total_price, total_co2
 
@@ -269,8 +271,8 @@ def reoptimize(
         best_candidate = None
         best_green = cur_green
 
-        search_dt = max(base_start, cur_start - timedelta(hours=2))
-        max_search_dt = cur_start + timedelta(hours=8)
+        search_dt = max(base_start, cur_start - timedelta(hours=1))
+        max_search_dt = cur_start + timedelta(hours=3)
 
         while search_dt <= max_search_dt:
             candidate_end = search_dt + timedelta(hours=duration_hours)

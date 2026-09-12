@@ -111,11 +111,18 @@ export const DriverView: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch initial station grid signal state on mount
+  // Fetch initial station grid signal state on mount & listen to WebSocket live sync events
   useEffect(() => {
-    fetchSchedule()
-      .then((st) => setLiveSignal(st.current_signal))
-      .catch((err) => console.warn('[DriverView] Live signal fetch failed, using fallback:', err));
+    const fetchSignal = () => {
+      fetchSchedule()
+        .then((st) => setLiveSignal(st.current_signal))
+        .catch((err) => console.warn('[DriverView] Live signal fetch failed, using fallback:', err));
+    };
+
+    fetchSignal();
+
+    window.addEventListener('voltwise:state_update', fetchSignal);
+    return () => window.removeEventListener('voltwise:state_update', fetchSignal);
   }, []);
 
   // Validation rules

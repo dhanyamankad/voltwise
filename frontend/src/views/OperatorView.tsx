@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { StationState, RenewableSignal } from '../types';
 import { fetchSchedule, fetchRenewableSignal, triggerRenewableDrop } from '../api/client';
 import { formatDisplayTime, calculateRenewableBreakdown } from '../lib/utils';
@@ -15,14 +16,18 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [timeframeFilter, setTimeframeFilter] = useState<'today' | '7days' | '30days'>('today');
 
-  const loadData = async () => {
+  const loadData = async (showToast: boolean = false) => {
     setIsLoading(true);
     setError(null);
     try {
       const [sched, sig] = await Promise.all([fetchSchedule(), fetchRenewableSignal()]);
       setStationState(sched);
       setSignalData(sig);
+      if (showToast) {
+        toast.success("Network state synchronized with backend database");
+      }
     } catch (err: any) {
       console.error('Failed to load operator data:', err);
       setError(err?.message || 'Failed to connect to backend station state.');
@@ -33,6 +38,16 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
 
   useEffect(() => {
     loadData();
+
+    // Auto-listen to global state refresh events (WebSocket updates from any user/tab)
+    const handleStateRefresh = () => {
+      loadData(false);
+    };
+
+    window.addEventListener('voltwise:state_update', handleStateRefresh);
+    return () => {
+      window.removeEventListener('voltwise:state_update', handleStateRefresh);
+    };
   }, []);
 
   const handleSimulateDrop = async () => {
@@ -62,12 +77,25 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
   const port1 = stationState?.ports.find((p) => p.id === 'port_1');
   const port2 = stationState?.ports.find((p) => p.id === 'port_2');
 
-  // Select active sessions for each port
-  const port1Sessions = stationState?.active_sessions.filter((s) => s.port_id === 'port_1') || [];
-  const session1 = port1Sessions.length > 0 ? port1Sessions[port1Sessions.length - 1] : null;
+  // Filter active valid sessions (exclude past end times)
+  const now = new Date();
+  const validActiveSessions = (stationState?.active_sessions || []).filter(s => {
+    try {
+      const endDt = new Date(s.end_time.endsWith('Z') ? s.end_time : `${s.end_time}Z`);
+      return endDt.getTime() >= now.getTime() - 5 * 60 * 1000;
+    } catch {
+      return true;
+    }
+  });
 
-  const port2Sessions = stationState?.active_sessions.filter((s) => s.port_id === 'port_2') || [];
-  const session2 = port2Sessions.length > 0 ? port2Sessions[port2Sessions.length - 1] : null;
+  // Separate Port 1 & Port 2 active sessions & queues
+  const port1Sessions = validActiveSessions.filter((s) => s.port_id === 'port_1');
+  const session1 = port1Sessions.length > 0 ? port1Sessions[0] : null;
+  const port1NextQueue = port1Sessions.length > 1 ? port1Sessions.slice(1) : [];
+
+  const port2Sessions = validActiveSessions.filter((s) => s.port_id === 'port_2');
+  const session2 = port2Sessions.length > 0 ? port2Sessions[0] : null;
+  const port2NextQueue = port2Sessions.length > 1 ? port2Sessions.slice(1) : [];
 
   const currentSignal = stationState?.current_signal;
   const renewablePct = currentSignal?.renewable_score ?? 84;
@@ -120,7 +148,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
             Operations Overview
           </h1>
           <p className="font-sans text-xs text-slate-400">
-            Real-time dispatch, port utilization, and clean energy allocation across your fleet network.
+            Real-time dispatch, station queues, port utilization, and clean energy allocation across your fleet network.
           </p>
         </div>
 
@@ -134,16 +162,43 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
             </span>
           </div>
 
-          {/* Timeframe Filter Selector */}
+          {/* Timeframe Filter Selector Tabs */}
           <div className="flex items-center p-1 rounded-xl bg-white/[0.05] border border-white/10 font-sans text-xs font-semibold">
-            <span className="px-3 py-1 rounded-lg text-slate-400 font-sans">Today</span>
-            <span className="px-3 py-1 rounded-lg text-slate-400 font-sans">Last 7 Days</span>
-            <span className="px-3 py-1 rounded-lg bg-blue-600 text-white font-sans font-bold shadow-sm">Last 30 Days</span>
+            <button
+              onClick={() => setTimeframeFilter('today')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-sans ${
+                timeframeFilter === 'today'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setTimeframeFilter('7days')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-sans ${
+                timeframeFilter === '7days'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Last 7 Days
+            </button>
+            <button
+              onClick={() => setTimeframeFilter('30days')}
+              className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-sans ${
+                timeframeFilter === '30days'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Last 30 Days
+            </button>
           </div>
 
-          {/* Refresh / Action Button */}
+          {/* Functional Refresh / Sync Action Button */}
           <button 
-            onClick={loadData}
+            onClick={() => loadData(true)}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-sans text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-base">refresh</span>
@@ -163,7 +218,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
             </div>
           </div>
           <button 
-            onClick={loadData}
+            onClick={() => loadData(true)}
             className="px-3 py-1.5 rounded-xl bg-red-500/30 hover:bg-red-500/40 text-red-100 font-bold text-xs border border-red-500/40 cursor-pointer"
           >
             Retry Connection
@@ -179,7 +234,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
         </div>
       )}
 
-      {/* SECTION 1: PHYSICAL CHARGING BAY CARDS */}
+      {/* SECTION 1: PHYSICAL CHARGING BAY CARDS WITH INDIVIDUAL STATION QUEUES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
         
         {/* CHARGING BAY 01 */}
@@ -190,7 +245,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 <span className="material-symbols-outlined text-xl">ev_station</span>
               </div>
               <div className="flex flex-col font-sans">
-                <span className="font-sans text-base font-bold text-white">Charging Bay 01</span>
+                <span className="font-sans text-base font-bold text-white">Charging Station 01 (Bay 1)</span>
                 <span className="font-sans text-xs text-slate-400">Max Power Limit: <strong className="text-cyan-400">{port1?.power_limit_kw || 50} kW</strong></span>
               </div>
             </div>
@@ -211,8 +266,8 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 className="flex flex-col gap-4 p-4 sm:p-5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 font-sans"
               >
                 <div className="flex items-center justify-between text-xs font-sans text-slate-400">
-                  <span>Session Identifier:</span>
-                  <span className="text-white font-mono font-semibold">{session1.id}</span>
+                  <span className="font-semibold text-cyan-400">Active Charging Vehicle:</span>
+                  <span className="text-white font-mono font-bold text-sm">{session1.ev_id}</span>
                 </div>
 
                 <div className="flex items-baseline justify-between pt-1 font-sans">
@@ -268,6 +323,43 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
               Bay 01 available / idle
             </div>
           )}
+
+          {/* STATION 1 UPCOMING SCHEDULED QUEUE */}
+          <div className="flex flex-col gap-2 border-t border-white/10 pt-4 font-sans">
+            <div className="flex items-center justify-between font-sans">
+              <span className="font-sans text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">format_list_bulleted</span>
+                Station 1 Scheduled Queue
+              </span>
+              <span className="text-[11px] font-semibold text-slate-400">
+                {port1NextQueue.length} Vehicle(s) Next Up
+              </span>
+            </div>
+
+            {port1NextQueue.length > 0 ? (
+              <div className="flex flex-col gap-2 font-sans max-h-44 overflow-y-auto pr-1">
+                {port1NextQueue.map((s) => (
+                  <div key={s.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between text-xs font-sans">
+                    <div className="flex flex-col gap-0.5 font-sans">
+                      <span className="font-bold text-white font-mono">{s.ev_id}</span>
+                      <span className="text-[11px] text-slate-400">{formatDisplayTime(s.start_time)} – {formatDisplayTime(s.end_time)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-sans">
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-[10px]">
+                        {s.green_score}% Clean
+                      </span>
+                      <span className="font-bold text-solar text-[11px]">₹{s.price_estimate.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-500 italic p-2.5 bg-white/[0.02] rounded-xl text-center">
+                No additional vehicles queued for Station 1
+              </span>
+            )}
+          </div>
+
         </div>
 
         {/* CHARGING BAY 02 (Priority Allocation Bay) */}
@@ -278,7 +370,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 <span className="material-symbols-outlined text-xl">emergency</span>
               </div>
               <div className="flex flex-col font-sans">
-                <span className="font-sans text-base font-bold text-white">Charging Bay 02</span>
+                <span className="font-sans text-base font-bold text-white">Charging Station 02 (Bay 2)</span>
                 <span className="font-sans text-xs text-slate-400">Max Power Limit: <strong className="text-alert-priority">{port2?.power_limit_kw || 50} kW</strong></span>
               </div>
             </div>
@@ -299,8 +391,8 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 className="flex flex-col gap-4 p-4 sm:p-5 rounded-2xl bg-white/[0.04] backdrop-blur-md border border-white/10 font-sans"
               >
                 <div className="flex items-center justify-between text-xs font-sans text-slate-400">
-                  <span>Session Identifier:</span>
-                  <span className="text-white font-mono font-semibold">{session2.id}</span>
+                  <span className="font-semibold text-alert-priority">Active Charging Vehicle:</span>
+                  <span className="text-white font-mono font-bold text-sm">{session2.ev_id}</span>
                 </div>
 
                 <div className="flex items-baseline justify-between pt-1 font-sans">
@@ -350,6 +442,43 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
               Bay 02 available / idle
             </div>
           )}
+
+          {/* STATION 2 UPCOMING SCHEDULED QUEUE */}
+          <div className="flex flex-col gap-2 border-t border-white/10 pt-4 font-sans">
+            <div className="flex items-center justify-between font-sans">
+              <span className="font-sans text-xs font-bold text-alert-priority flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">format_list_bulleted</span>
+                Station 2 Scheduled Queue
+              </span>
+              <span className="text-[11px] font-semibold text-slate-400">
+                {port2NextQueue.length} Vehicle(s) Next Up
+              </span>
+            </div>
+
+            {port2NextQueue.length > 0 ? (
+              <div className="flex flex-col gap-2 font-sans max-h-44 overflow-y-auto pr-1">
+                {port2NextQueue.map((s) => (
+                  <div key={s.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between text-xs font-sans">
+                    <div className="flex flex-col gap-0.5 font-sans">
+                      <span className="font-bold text-white font-mono">{s.ev_id}</span>
+                      <span className="text-[11px] text-slate-400">{formatDisplayTime(s.start_time)} – {formatDisplayTime(s.end_time)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-sans">
+                      <span className="px-2 py-0.5 rounded-full bg-alert-priority/20 text-alert-priority font-bold text-[10px]">
+                        {s.green_score}% Clean
+                      </span>
+                      <span className="font-bold text-solar text-[11px]">₹{s.price_estimate.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-500 italic p-2.5 bg-white/[0.02] rounded-xl text-center">
+                No additional vehicles queued for Station 2
+              </span>
+            )}
+          </div>
+
         </div>
 
       </div>
@@ -357,12 +486,12 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
       {/* SECTION 2: QUEUE & 24H SIGNAL FORECAST */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start font-sans">
         
-        {/* PENDING DISPATCH QUEUE */}
+        {/* PENDING DISPATCH QUEUE (UNASSIGNED) */}
         <div className="lg:col-span-5 flex flex-col rounded-3xl bg-[#121721]/80 backdrop-blur-xl border border-white/10 p-6 sm:p-7 shadow-2xl shadow-black/50 gap-5 font-sans">
           <div className="flex items-center justify-between border-b border-white/10 pb-3 font-sans">
             <h2 className="font-display text-base font-bold text-white flex items-center gap-2">
               <span className="material-symbols-outlined text-cyan-400 text-lg">queue</span>
-              Pending Dispatch Queue
+              Unassigned Dispatch Queue
             </h2>
             <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-sans text-xs font-semibold">
               {stationState?.pending_requests.length || 0} Waiting
@@ -401,7 +530,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
             ) : (
               <div className="p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 flex flex-col items-center justify-center text-center gap-2 text-slate-400 text-xs my-auto">
                 <span className="material-symbols-outlined text-2xl text-slate-500">check_circle</span>
-                <span>No pending dispatch requests. All vehicles allocated.</span>
+                <span>No pending unassigned requests. All vehicles allocated.</span>
               </div>
             )}
           </div>

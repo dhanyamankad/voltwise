@@ -49,6 +49,9 @@ export function useLiveUpdates(onPlanChanged?: (event: PlanChangedEvent) => void
         socket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            // Dispatch global state refresh event for all active views
+            window.dispatchEvent(new CustomEvent('voltwise:state_update'));
+            
             if (data.type === 'plan_changed') {
               const planEvent: PlanChangedEvent = data;
               setLastEvent(planEvent);
