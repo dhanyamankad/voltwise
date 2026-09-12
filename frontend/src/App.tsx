@@ -55,8 +55,9 @@ export const App: React.FC = () => {
       <Toaster position="bottom-right" theme="dark" expand={true} />
       
       {activeView !== 'landing' && (
-        <Header activeView={activeView} setActiveView={setActiveView} solarPct={energyMix.solarPct} windPct={energyMix.windPct} />
+        <Header activeView={activeView} setActiveView={setActiveView} />
       )}
+
 
       {activeView === 'landing' ? (
         <DigitalSerenity

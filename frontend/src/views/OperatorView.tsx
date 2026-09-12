@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { StationState, RenewableSignal } from '../types';
 import { fetchSchedule, fetchRenewableSignal, triggerRenewableDrop } from '../api/client';
-import { formatDisplayTime, calculateRenewableBreakdown } from '../lib/utils';
+import { formatDisplayTime, formatDisplayDateTime, calculateRenewableBreakdown } from '../lib/utils';
+
 
 interface OperatorViewProps {
   onTriggerSimDrop: () => void;
@@ -291,7 +292,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                     transition={{ duration: 0.2 }}
                     className="font-sans text-xl sm:text-2xl font-bold text-cyan-400 drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]"
                   >
-                    {formatDisplayTime(session1.start_time)} – {formatDisplayTime(session1.end_time)}
+                    {formatDisplayDateTime(session1.start_time)} – {formatDisplayTime(session1.end_time)}
                   </motion.span>
                 </div>
 
@@ -326,13 +327,6 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                     <span className="font-sans text-base font-bold text-cyan-400">{session1.co2_estimate_kg} kg</span>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-start gap-2 font-sans">
-                  <span className="material-symbols-outlined text-cyan-400 text-base mt-0.5 shrink-0">info</span>
-                  <p className="font-sans text-xs text-slate-300 leading-relaxed">
-                    {session1.reason}
-                  </p>
-                </div>
               </motion.div>
             </AnimatePresence>
           ) : (
@@ -359,7 +353,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                   <div key={s.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between text-xs font-sans">
                     <div className="flex flex-col gap-0.5 font-sans">
                       <span className="font-bold text-white font-mono">{s.ev_id}</span>
-                      <span className="text-[11px] text-slate-400">{formatDisplayTime(s.start_time)} – {formatDisplayTime(s.end_time)}</span>
+                      <span className="text-[11px] text-slate-400">{formatDisplayDateTime(s.start_time)} – {formatDisplayTime(s.end_time)}</span>
                     </div>
                     <div className="flex items-center gap-2 font-sans">
                       <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-[10px]">
@@ -415,7 +409,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 <div className="flex items-baseline justify-between pt-1 font-sans">
                   <span className="font-sans text-xs text-slate-400">Active Window:</span>
                   <span className="font-sans text-xl sm:text-2xl font-bold text-alert-priority">
-                    {formatDisplayTime(session2.start_time)} – {formatDisplayTime(session2.end_time)}
+                    {formatDisplayDateTime(session2.start_time)} – {formatDisplayTime(session2.end_time)}
                   </span>
                 </div>
 
@@ -450,13 +444,6 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                     <span className="font-sans text-base font-bold text-alert-priority">{session2.co2_estimate_kg} kg</span>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-start gap-2 font-sans">
-                  <span className="material-symbols-outlined text-alert-priority text-base mt-0.5 shrink-0">info</span>
-                  <p className="font-sans text-xs text-slate-300 leading-relaxed">
-                    {session2.reason}
-                  </p>
-                </div>
               </motion.div>
             </AnimatePresence>
           ) : (
@@ -483,7 +470,7 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                   <div key={s.id} className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between text-xs font-sans">
                     <div className="flex flex-col gap-0.5 font-sans">
                       <span className="font-bold text-white font-mono">{s.ev_id}</span>
-                      <span className="text-[11px] text-slate-400">{formatDisplayTime(s.start_time)} – {formatDisplayTime(s.end_time)}</span>
+                      <span className="text-[11px] text-slate-400">{formatDisplayDateTime(s.start_time)} – {formatDisplayTime(s.end_time)}</span>
                     </div>
                     <div className="flex items-center gap-2 font-sans">
                       <span className="px-2 py-0.5 rounded-full bg-alert-priority/20 text-alert-priority font-bold text-[10px]">

@@ -25,6 +25,30 @@ export function formatDisplayTime(timeStr?: string): string {
 }
 
 /**
+ * Formats ISO 8601 string to short Date + 12-hour Time format (e.g. "Sep 13, 8:05 PM")
+ */
+export function formatDisplayDateTime(timeStr?: string): string {
+  if (!timeStr) return '';
+  if (timeStr.includes('T') || timeStr.includes('Z')) {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      const dateStr = d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      });
+      const timeStrFormatted = d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      return `${dateStr}, ${timeStrFormatted}`;
+    }
+  }
+  return timeStr;
+}
+
+
+/**
  * Data-driven solar, wind, and grid percentage breakdown based on raw weather parameters
  */
 export function calculateRenewableBreakdown(
