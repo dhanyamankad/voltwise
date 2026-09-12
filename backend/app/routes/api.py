@@ -22,8 +22,9 @@ from backend.app.ws import manager
 # Tanvi's real Scheduler engine:
 from backend.app.scheduler.engine import build_schedule, reoptimize
 from backend.app.scheduler.models import Session as SchedulerSession
-# Vanshi's Forecasting module (currently stub):
-from backend.app.forecasting_stub import get_renewable_signal, trigger_renewable_drop
+# Vanshi's real Forecasting & Simulation engine:
+from backend.app.forecasting.signal import get_renewable_signal
+from backend.app.forecasting.simulate import trigger_renewable_drop, get_current_signal
 
 
 def _to_pydantic_session(s) -> Session:
@@ -32,6 +33,22 @@ def _to_pydantic_session(s) -> Session:
     if hasattr(s, "to_dict"):
         return Session(**s.to_dict())
     return Session(**dict(s))
+
+
+def _to_pydantic_signal(item) -> RenewableSignal:
+    if isinstance(item, RenewableSignal):
+        return item
+    return RenewableSignal(**item)
+
+
+def _get_active_signals(city: str = "ahmedabad", hours_ahead: int = 24) -> list[RenewableSignal]:
+    try:
+        raw = get_current_signal(city=city)
+        if not raw:
+            raw = get_renewable_signal(city=city, hours_ahead=hours_ahead)
+    except Exception:
+        raw = get_renewable_signal(city=city, hours_ahead=hours_ahead)
+    return [_to_pydantic_signal(item) for item in raw]
 
 
 router = APIRouter(prefix="/api")
@@ -62,7 +79,7 @@ async def create_ev_request(req_in: EVRequestCreate):
     
     # Fetch current ports and weather signal
     ports = db.get_ports()
-    signal = get_renewable_signal()
+    signal = _get_active_signals()
     
     # Run real scheduler engine
     raw_sessions = build_schedule([ev_req], ports, signal)
@@ -104,7 +121,7 @@ async def get_schedule():
     ports = db.get_ports()
     active_sessions = db.get_active_sessions()
     pending_requests = db.get_ev_requests()
-    signals = get_renewable_signal()
+    signals = _get_active_signals()
     current_signal = signals[0] if signals else RenewableSignal(
         timestamp=datetime.now().isoformat(),
         solar_irradiance=0.0,
@@ -125,13 +142,13 @@ async def get_schedule():
 
 @router.get("/renewable-signal", response_model=list[RenewableSignal])
 async def get_signal_endpoint(
-    city: str = Query(default="Austin", description="Demo city name"),
+    city: str = Query(default="ahmedabad", description="Demo city name"),
     hours_ahead: int = Query(default=24, ge=1, le=48, description="Forecast horizon")
 ):
     """
     Returns 24-hour renewable availability, price, and carbon intensity signals.
     """
-    return get_renewable_signal(city=city, hours_ahead=hours_ahead)
+    return _get_active_signals(city=city, hours_ahead=hours_ahead)
 
 
 @router.post("/simulate/renewable-drop", response_model=GenericOkResponse)
@@ -143,9 +160,9 @@ async def simulate_renewable_drop(payload: RenewableDropPayload):
     3. Persists changed sessions.
     4. Pushes PlanChangedEvent to all WebSocket clients.
     """
-    # 1. Update signal state
-    trigger_renewable_drop(payload.new_score)
-    updated_signal = get_renewable_signal()
+    # 1. Update signal state via simulation hook
+    trigger_renewable_drop(new_score=payload.new_score)
+    updated_signal = _get_active_signals()
     
     # 2. Re-optimize active sessions
     active_sessions = db.get_active_sessions()

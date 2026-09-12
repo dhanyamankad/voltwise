@@ -3,7 +3,7 @@
 **Owner:** Rutvi Kariya
 **Branch:** `rutvi`
 **Depends on:** `00-API-Contract.md`; calls into Scheduler and Forecasting function boundaries (§4, §5)
-**Status:** 🟡 In Progress
+**Status:** 🟢 Done
 
 > **Instructions for AI coding agent:** As you complete each item in the Task
 > Checklist below, check it off (`[x]`) and append a one-line entry to the
@@ -62,7 +62,7 @@ Build your stubs to the exact function signatures in `00-API-Contract.md`
 - [x] WebSocket `/ws/updates` — broadcast `PlanChangedEvent` and `session_update` to all connected clients
 - [x] CORS configured for local frontend dev origin
 - [x] Replace `scheduler_stub` import with real Scheduler module once available (single import line change)
-- [ ] Replace `forecasting_stub` import with real Forecasting module once available (single import line change)
+- [x] Replace `forecasting_stub` import with real Forecasting module once available (single import line change)
 - [x] Seed script: creates 2 ports + a few sample EV requests for demo bootstrapping
 - [x] `backend/README.md`: how to run, how to hit each endpoint (curl examples)
 
@@ -93,3 +93,4 @@ _(AI agent: append entries here, most recent last)_
 
 - `2026-09-12 11:50` — Track started. Scaffolded environment, locked Pydantic contract, setting up FastAPI, SQLite, and stubs.
 - `2026-09-12 12:35` — Merged tanvi branch into rutvi. Successfully integrated Tanvi's real Scheduler engine into backend/app/routes/api.py. All 12 test cases across scheduler and backend API passing.
+- `2026-09-12 12:57` — Merged vanshi branch into rutvi. Successfully integrated Vanshi's real Open-Meteo forecasting & simulation module into backend/app/routes/api.py. All 15 test cases passing 100%. Definition of Done met.

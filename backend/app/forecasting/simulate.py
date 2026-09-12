@@ -59,6 +59,21 @@ def trigger_renewable_drop(
             new_item["price_signal"] = new_price
             new_item["carbon_intensity"] = new_carbon
 
+        elif end_idx <= idx < end_idx + 4:
+            # Model passing cloud front clearing: high solar recovery window for adaptive slot shifting
+            recovery_score = max(new_item["renewable_score"], 84.0)
+            ratio = recovery_score / max(new_item["renewable_score"], 1.0)
+            new_item["solar_irradiance"] = round(max(new_item["solar_irradiance"], 750.0), 1)
+            new_item["wind_speed"] = round(max(new_item["wind_speed"], 6.0), 1)
+            new_item["renewable_score"] = recovery_score
+            _, new_price, new_carbon = _calculate_derived_metrics(
+                new_item["solar_irradiance"],
+                new_item["wind_speed"],
+                new_item["temperature"]
+            )
+            new_item["price_signal"] = new_price
+            new_item["carbon_intensity"] = new_carbon
+
         updated_signal.append(new_item)
 
     _ACTIVE_SIGNAL_CACHE = updated_signal
