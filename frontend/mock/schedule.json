@@ -1,0 +1,85 @@
+{
+  "ports": [
+    {
+      "id": "port_1",
+      "status": "occupied",
+      "power_limit_kw": 50.0,
+      "current_session_id": "session_101"
+    },
+    {
+      "id": "port_2",
+      "status": "occupied",
+      "power_limit_kw": 50.0,
+      "current_session_id": "session_102"
+    }
+  ],
+  "active_sessions": [
+    {
+      "id": "session_101",
+      "ev_id": "ev_101",
+      "port_id": "port_1",
+      "start_time": "2:15 PM",
+      "end_time": "4:30 PM",
+      "status": "charging",
+      "price_estimate": 6.40,
+      "green_score": 88,
+      "co2_estimate_kg": 4.2,
+      "reason": "Scheduled at 2:15 PM during peak solar generation (86% renewable energy).",
+      "version": 1
+    },
+    {
+      "id": "session_102",
+      "ev_id": "ev_102",
+      "port_id": "port_2",
+      "start_time": "2:30 PM",
+      "end_time": "3:15 PM",
+      "status": "charging",
+      "price_estimate": 11.80,
+      "green_score": 52,
+      "co2_estimate_kg": 7.8,
+      "reason": "Protected priority dispatch allocation for emergency response vehicle.",
+      "version": 1
+    }
+  ],
+  "pending_requests": [
+    {
+      "id": "req_201",
+      "vehicle_class": "priority",
+      "current_soc": 32,
+      "target_soc": 80,
+      "deadline": "6:00 PM",
+      "charging_rate_kw": 50,
+      "preference": "balanced",
+      "created_at": "2026-09-12T11:00:00Z"
+    },
+    {
+      "id": "req_202",
+      "vehicle_class": "normal",
+      "current_soc": 45,
+      "target_soc": 70,
+      "deadline": "7:30 PM",
+      "charging_rate_kw": 50,
+      "preference": "balanced",
+      "created_at": "2026-09-12T11:15:00Z"
+    },
+    {
+      "id": "req_203",
+      "vehicle_class": "normal",
+      "current_soc": 18,
+      "target_soc": 90,
+      "deadline": "9:00 PM",
+      "charging_rate_kw": 50,
+      "preference": "greenest",
+      "created_at": "2026-09-12T11:20:00Z"
+    }
+  ],
+  "current_signal": {
+    "timestamp": "2026-09-12T14:00:00Z",
+    "solar_irradiance": 860.0,
+    "wind_speed": 12.5,
+    "temperature": 24.5,
+    "renewable_score": 86,
+    "price_signal": 0.11,
+    "carbon_intensity": 90
+  }
+}
