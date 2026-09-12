@@ -61,7 +61,7 @@ Build your stubs to the exact function signatures in `00-API-Contract.md`
 - [x] `POST /api/simulate/renewable-drop` — updates signal, calls `reoptimize()`, persists changed sessions
 - [x] WebSocket `/ws/updates` — broadcast `PlanChangedEvent` and `session_update` to all connected clients
 - [x] CORS configured for local frontend dev origin
-- [ ] Replace `scheduler_stub` import with real Scheduler module once available (single import line change)
+- [x] Replace `scheduler_stub` import with real Scheduler module once available (single import line change)
 - [ ] Replace `forecasting_stub` import with real Forecasting module once available (single import line change)
 - [x] Seed script: creates 2 ports + a few sample EV requests for demo bootstrapping
 - [x] `backend/README.md`: how to run, how to hit each endpoint (curl examples)
@@ -92,3 +92,4 @@ backend/
 _(AI agent: append entries here, most recent last)_
 
 - `2026-09-12 11:50` — Track started. Scaffolded environment, locked Pydantic contract, setting up FastAPI, SQLite, and stubs.
+- `2026-09-12 12:35` — Merged tanvi branch into rutvi. Successfully integrated Tanvi's real Scheduler engine into backend/app/routes/api.py. All 12 test cases across scheduler and backend API passing.

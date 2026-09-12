@@ -19,11 +19,20 @@ from backend.app import db
 from backend.app.ws import manager
 
 # --- Modular Imports for Scheduler and Forecasting ---
-# Once Tanvi's and Vanshi's modules are ready, only these 2 import lines change:
-# from backend.app.scheduler.engine import build_schedule, reoptimize
-# from backend.app.forecasting.weather import get_renewable_signal, trigger_renewable_drop
-from backend.app.scheduler_stub import build_schedule, reoptimize
+# Tanvi's real Scheduler engine:
+from backend.app.scheduler.engine import build_schedule, reoptimize
+from backend.app.scheduler.models import Session as SchedulerSession
+# Vanshi's Forecasting module (currently stub):
 from backend.app.forecasting_stub import get_renewable_signal, trigger_renewable_drop
+
+
+def _to_pydantic_session(s) -> Session:
+    if isinstance(s, Session):
+        return s
+    if hasattr(s, "to_dict"):
+        return Session(**s.to_dict())
+    return Session(**dict(s))
+
 
 router = APIRouter(prefix="/api")
 
@@ -55,15 +64,15 @@ async def create_ev_request(req_in: EVRequestCreate):
     ports = db.get_ports()
     signal = get_renewable_signal()
     
-    # Run scheduler
-    new_sessions = build_schedule([ev_req], ports, signal)
-    if not new_sessions:
+    # Run real scheduler engine
+    raw_sessions = build_schedule([ev_req], ports, signal)
+    if not raw_sessions:
         raise HTTPException(
             status_code=400,
             detail="Could not allocate charging slot: hard constraints (deadline/capacity) violated"
         )
         
-    session = new_sessions[0]
+    session = _to_pydantic_session(raw_sessions[0])
     db.save_session(session)
     
     # Broadcast session_update over WebSocket
@@ -144,10 +153,12 @@ async def simulate_renewable_drop(payload: RenewableDropPayload):
     # Store old windows before mutation
     old_windows = {s.id: (s.start_time, s.end_time) for s in active_sessions}
     
-    changed_sessions = reoptimize(active_sessions, updated_signal)
+    sched_sessions = [SchedulerSession(**s.model_dump()) for s in active_sessions]
+    raw_changed = reoptimize(sched_sessions, updated_signal)
     
     now_iso = datetime.now().isoformat()
-    for changed in changed_sessions:
+    for raw in raw_changed:
+        changed = _to_pydantic_session(raw)
         db.update_session(changed)
         
         old_start, old_end = old_windows.get(changed.id, (changed.start_time, changed.end_time))

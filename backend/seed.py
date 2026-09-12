@@ -5,8 +5,8 @@ matching the HackOut'26 pitch scenario.
 """
 from datetime import datetime, timedelta
 from backend.app import db
-from backend.app.models import EVRequest, Port
-from backend.app.scheduler_stub import build_schedule
+from backend.app.models import EVRequest, Port, Session
+from backend.app.scheduler.engine import build_schedule
 from backend.app.forecasting_stub import get_renewable_signal
 
 
@@ -61,22 +61,25 @@ def seed():
     for req in requests:
         db.save_ev_request(req)
 
-    # 3. Schedule Sessions
+    # 3. Schedule Sessions using real scheduler engine
     signal = get_renewable_signal()
-    sessions = build_schedule(requests, ports, signal)
-    for s in sessions:
+    raw_sessions = build_schedule(requests, ports, signal)
+    sessions: list[Session] = []
+    for raw in raw_sessions:
+        s = Session(**raw.to_dict()) if hasattr(raw, "to_dict") else raw
+        sessions.append(s)
         db.save_session(s)
         # Link first session to port_1
         if s.port_id == "port_1" and not ports[0].current_session_id:
             ports[0].current_session_id = s.id
             db.update_port(ports[0])
 
-    print("\n✅ Seed completed successfully!")
+    print("\n[SUCCESS] Seed completed successfully!")
     print(f"  Ports: {len(ports)} (port_1: 50kW, port_2: 50kW)")
     print(f"  Requests seeded: {len(requests)}")
     print(f"  Sessions scheduled: {len(sessions)}")
     for s in sessions:
-        print(f"    • Session [{s.id}] on {s.port_id}: {s.start_time[11:16]} - {s.end_time[11:16]} | Score: {s.green_score}% | {s.reason}")
+        print(f"    - Session [{s.id}] on {s.port_id}: {s.start_time[11:16]} - {s.end_time[11:16]} | Score: {s.green_score}% | {s.reason}")
 
 
 if __name__ == "__main__":
