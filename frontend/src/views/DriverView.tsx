@@ -108,11 +108,14 @@ export const DriverView: React.FC = () => {
 
     setIsLoading(true);
     try {
+      // Calculate a valid future deadline ISO timestamp (default 6 hours ahead) for the backend scheduler
+      const futureDeadline = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
+
       const requestData: EVRequest = {
         vehicle_class: vehicleClass,
         current_soc: currentSoc,
         target_soc: targetSoc,
-        deadline,
+        deadline: futureDeadline,
         charging_rate_kw: chargingRateKw,
         preference
       };

@@ -60,11 +60,6 @@ export const App: React.FC = () => {
         detail: { x: window.innerWidth * 0.5, y: window.innerHeight * 0.35 }
       })
     );
-
-    emitMockPlanChange(
-      'session_101',
-      'AUTO-RESCHEDULED: Sudden 30% solar drop detected. Session moved to 3:15 PM peak clean window.'
-    );
   };
 
   return (

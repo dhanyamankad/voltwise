@@ -1,20 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { PlanChangedEvent } from '../types';
-import { USE_MOCK, WS_BASE_URL } from '../api/client';
+import { WS_BASE_URL } from '../api/client';
 
 export function useLiveUpdates(onPlanChanged?: (event: PlanChangedEvent) => void) {
-  const [isConnected, setIsConnected] = useState<boolean>(USE_MOCK);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [lastEvent, setLastEvent] = useState<PlanChangedEvent | null>(null);
 
   const emitMockPlanChange = useCallback((
     sessionId: string = 'session_101',
-    reason: string = 'AUTO-RESCHEDULED: Sudden 30% solar drop detected. Session moved to 15:15 peak clean window.'
+    reason: string = 'AUTO-RESCHEDULED: Sudden 30% solar drop detected. Session moved to 3:15 PM peak clean window.'
   ) => {
     const mockEvent: PlanChangedEvent = {
       type: 'plan_changed',
       session_id: sessionId,
-      old_window: { start: '14:15', end: '16:30' },
-      new_window: { start: '15:15', end: '17:30' },
+      old_window: { start: '2:15 PM', end: '4:30 PM' },
+      new_window: { start: '3:15 PM', end: '5:30 PM' },
       reason,
       timestamp: new Date().toISOString()
     };
@@ -23,46 +23,53 @@ export function useLiveUpdates(onPlanChanged?: (event: PlanChangedEvent) => void
   }, [onPlanChanged]);
 
   useEffect(() => {
-    if (USE_MOCK) {
-      setIsConnected(true);
-      return;
-    }
-
     let socket: WebSocket | null = null;
-    try {
-      socket = new WebSocket(WS_BASE_URL);
+    let reconnectTimer: any = null;
 
-      socket.onopen = () => {
-        setIsConnected(true);
-      };
+    function connect() {
+      try {
+        socket = new WebSocket(WS_BASE_URL);
 
-      socket.onmessage = (event) => {
-        try {
-          const data: PlanChangedEvent = JSON.parse(event.data);
-          setLastEvent(data);
+        socket.onopen = () => {
+          setIsConnected(true);
+        };
 
-          if (data.type === 'plan_changed' && onPlanChanged) {
-            onPlanChanged(data);
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'plan_changed') {
+              const planEvent: PlanChangedEvent = data;
+              setLastEvent(planEvent);
+              if (onPlanChanged) onPlanChanged(planEvent);
+            }
+          } catch (err) {
+            console.error('Error parsing WebSocket message:', err);
           }
-        } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
-        }
-      };
+        };
 
-      socket.onclose = () => {
-        setIsConnected(false);
-      };
+        socket.onclose = () => {
+          setIsConnected(false);
+          // Try reconnecting after 3 seconds if disconnected
+          reconnectTimer = setTimeout(connect, 3000);
+        };
 
-      socket.onerror = (err) => {
-        console.error('WebSocket Error:', err);
+        socket.onerror = () => {
+          setIsConnected(false);
+        };
+      } catch (e) {
+        console.error('Failed to establish WebSocket connection:', e);
         setIsConnected(false);
-      };
-    } catch (e) {
-      console.error('Failed to establish WebSocket connection:', e);
+      }
     }
+
+    connect();
 
     return () => {
-      if (socket) socket.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket) {
+        socket.onclose = null; // Prevent reconnect on explicit unmount
+        socket.close();
+      }
     };
   }, [onPlanChanged]);
 
