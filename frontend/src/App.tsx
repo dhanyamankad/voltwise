@@ -19,7 +19,7 @@ export const App: React.FC = () => {
     );
   };
 
-  const { isConnected, emitMockPlanChange } = useLiveUpdates((event) => {
+  const { isConnected } = useLiveUpdates((event) => {
     showPlanChangedToast(event);
   });
 
@@ -29,13 +29,6 @@ export const App: React.FC = () => {
         detail: { x: window.innerWidth * 0.5, y: window.innerHeight * 0.35 }
       })
     );
-
-    // Guaranteed fallback: If WebSocket is offline or hasn't pushed an event within 600ms, fire mock toast
-    setTimeout(() => {
-      if (!isConnected) {
-        emitMockPlanChange();
-      }
-    }, 600);
   };
 
   return (

@@ -107,15 +107,17 @@ def build_schedule(
     requests: List[EVRequest],
     ports: List[Port],
     signal: List[RenewableSignal],
+    existing_sessions: Optional[List[Session]] = None,
 ) -> List[Session]:
     """
     Computes optimal charging sessions for a list of EV requests against available ports
-    and energy signals. Respects deadlines and priority protection.
+    and energy signals. Respects deadlines, priority protection, and existing active sessions.
     """
     if not requests or not ports:
         return []
 
-    scheduled_sessions: List[Session] = []
+    scheduled_sessions: List[Session] = list(existing_sessions) if existing_sessions else []
+    initial_count = len(scheduled_sessions)
 
     # Separate priority vs normal requests
     priority_reqs = [r for r in requests if r.vehicle_class == "priority"]
@@ -232,7 +234,7 @@ def build_schedule(
             )
             scheduled_sessions.append(sess)
 
-    return scheduled_sessions
+    return scheduled_sessions[initial_count:]
 
 
 def reoptimize(

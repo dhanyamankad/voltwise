@@ -10,9 +10,19 @@ from backend.app.scheduler.engine import build_schedule
 from backend.app.forecasting_stub import get_renewable_signal
 
 
+def clear_db():
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions")
+        cursor.execute("DELETE FROM ev_requests")
+        cursor.execute("UPDATE ports SET status = 'idle', current_session_id = NULL")
+        conn.commit()
+
+
 def seed():
-    print("Initializing database...")
+    print("Initializing & resetting database to clean state...")
     db.init_db()
+    clear_db()
 
     now = datetime.now().replace(microsecond=0)
 

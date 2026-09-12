@@ -84,12 +84,13 @@ async def create_ev_request(req_in: EVRequestCreate):
     # Save EV request to database
     db.save_ev_request(ev_req)
     
-    # Fetch current ports and weather signal
+    # Fetch current ports, active sessions, and weather signal
     ports = db.get_ports()
+    active_sessions = db.get_active_sessions()
     signal = _get_active_signals()
     
-    # Run real scheduler engine
-    raw_sessions = build_schedule([ev_req], ports, signal)
+    # Run real scheduler engine with existing active sessions for conflict-free multi-port allocation
+    raw_sessions = build_schedule([ev_req], ports, signal, existing_sessions=active_sessions)
     if not raw_sessions:
         raise HTTPException(
             status_code=400,
