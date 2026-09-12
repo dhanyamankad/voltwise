@@ -103,16 +103,8 @@ export const DriverView: React.FC = () => {
   const [recommendation, setRecommendation] = useState<Session | null>(null);
 
   useEffect(() => {
-    async function loadInitialData() {
-      try {
-        const state = await fetchSchedule();
-        const active = state.active_sessions.find((s) => s.port_id === 'port_1') || state.active_sessions[0];
-        if (active) setRecommendation(active);
-      } catch (err) {
-        console.error('Failed to load initial schedule:', err);
-      }
-    }
-    loadInitialData();
+    // Initial load: keep recommendation null so driver sees empty standby guidance state
+    setRecommendation(null);
   }, []);
 
   const isInvalidSoc = currentSoc > targetSoc;
@@ -523,7 +515,17 @@ export const DriverView: React.FC = () => {
               </motion.div>
             </AnimatePresence>
           ) : (
-            <div className="p-12 text-center text-slate-400 font-sans">Loading recommendation...</div>
+            <div className="py-16 px-6 sm:px-10 rounded-2xl bg-white/[0.02] border border-dashed border-white/15 flex flex-col items-center justify-center text-center gap-5 font-sans my-auto min-h-[320px]">
+              <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+                <span className="material-symbols-outlined text-3xl animate-pulse">electric_bolt</span>
+              </div>
+              <div className="flex flex-col gap-2 max-w-sm font-sans">
+                <h3 className="font-sans text-base font-bold text-white">Ready to Calculate Your Clean Schedule</h3>
+                <p className="font-sans text-xs text-slate-400 leading-relaxed">
+                  Select your vehicle battery target and preference on the left, then click <strong className="text-cyan-400 font-semibold">Request Clean Schedule</strong> to assign your optimal green window.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
