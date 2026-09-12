@@ -1,0 +1,218 @@
+[
+  {
+    "timestamp": "2026-09-12T00:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 4.2,
+    "temperature": 27.5,
+    "renewable_score": 15.0,
+    "price_signal": 88.0,
+    "carbon_intensity": 85.0
+  },
+  {
+    "timestamp": "2026-09-12T01:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 4.0,
+    "temperature": 27.0,
+    "renewable_score": 14.5,
+    "price_signal": 88.5,
+    "carbon_intensity": 85.5
+  },
+  {
+    "timestamp": "2026-09-12T02:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 3.8,
+    "temperature": 26.8,
+    "renewable_score": 13.8,
+    "price_signal": 89.0,
+    "carbon_intensity": 86.0
+  },
+  {
+    "timestamp": "2026-09-12T03:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 3.5,
+    "temperature": 26.5,
+    "renewable_score": 12.5,
+    "price_signal": 90.0,
+    "carbon_intensity": 87.5
+  },
+  {
+    "timestamp": "2026-09-12T04:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 3.6,
+    "temperature": 26.2,
+    "renewable_score": 13.0,
+    "price_signal": 89.5,
+    "carbon_intensity": 87.0
+  },
+  {
+    "timestamp": "2026-09-12T05:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 4.0,
+    "temperature": 26.5,
+    "renewable_score": 14.5,
+    "price_signal": 88.5,
+    "carbon_intensity": 85.5
+  },
+  {
+    "timestamp": "2026-09-12T06:00:00Z",
+    "solar_irradiance": 45.0,
+    "wind_speed": 4.5,
+    "temperature": 27.5,
+    "renewable_score": 22.0,
+    "price_signal": 82.5,
+    "carbon_intensity": 78.0
+  },
+  {
+    "timestamp": "2026-09-12T07:00:00Z",
+    "solar_irradiance": 180.0,
+    "wind_speed": 5.2,
+    "temperature": 29.0,
+    "renewable_score": 38.0,
+    "price_signal": 69.5,
+    "carbon_intensity": 62.0
+  },
+  {
+    "timestamp": "2026-09-12T08:00:00Z",
+    "solar_irradiance": 380.0,
+    "wind_speed": 5.8,
+    "temperature": 31.0,
+    "renewable_score": 54.0,
+    "price_signal": 56.5,
+    "carbon_intensity": 46.0
+  },
+  {
+    "timestamp": "2026-09-12T09:00:00Z",
+    "solar_irradiance": 580.0,
+    "wind_speed": 6.4,
+    "temperature": 33.0,
+    "renewable_score": 70.0,
+    "price_signal": 43.5,
+    "carbon_intensity": 30.0
+  },
+  {
+    "timestamp": "2026-09-12T10:00:00Z",
+    "solar_irradiance": 750.0,
+    "wind_speed": 6.8,
+    "temperature": 34.5,
+    "renewable_score": 82.0,
+    "price_signal": 34.0,
+    "carbon_intensity": 18.0
+  },
+  {
+    "timestamp": "2026-09-12T11:00:00Z",
+    "solar_irradiance": 860.0,
+    "wind_speed": 7.2,
+    "temperature": 35.8,
+    "renewable_score": 86.0,
+    "price_signal": 30.5,
+    "carbon_intensity": 14.0
+  },
+  {
+    "timestamp": "2026-09-12T12:00:00Z",
+    "solar_irradiance": 910.0,
+    "wind_speed": 7.0,
+    "temperature": 36.5,
+    "renewable_score": 88.0,
+    "price_signal": 29.0,
+    "carbon_intensity": 12.0
+  },
+  {
+    "timestamp": "2026-09-12T13:00:00Z",
+    "solar_irradiance": 880.0,
+    "wind_speed": 6.6,
+    "temperature": 36.2,
+    "renewable_score": 86.0,
+    "price_signal": 30.5,
+    "carbon_intensity": 14.0
+  },
+  {
+    "timestamp": "2026-09-12T14:00:00Z",
+    "solar_irradiance": 780.0,
+    "wind_speed": 6.2,
+    "temperature": 35.5,
+    "renewable_score": 80.0,
+    "price_signal": 35.5,
+    "carbon_intensity": 20.0
+  },
+  {
+    "timestamp": "2026-09-12T15:00:00Z",
+    "solar_irradiance": 620.0,
+    "wind_speed": 5.8,
+    "temperature": 34.2,
+    "renewable_score": 71.0,
+    "price_signal": 42.5,
+    "carbon_intensity": 29.0
+  },
+  {
+    "timestamp": "2026-09-12T16:00:00Z",
+    "solar_irradiance": 410.0,
+    "wind_speed": 5.4,
+    "temperature": 33.0,
+    "renewable_score": 56.0,
+    "price_signal": 55.0,
+    "carbon_intensity": 44.0
+  },
+  {
+    "timestamp": "2026-09-12T17:00:00Z",
+    "solar_irradiance": 190.0,
+    "wind_speed": 5.0,
+    "temperature": 31.5,
+    "renewable_score": 39.0,
+    "price_signal": 68.5,
+    "carbon_intensity": 61.0
+  },
+  {
+    "timestamp": "2026-09-12T18:00:00Z",
+    "solar_irradiance": 30.0,
+    "wind_speed": 4.6,
+    "temperature": 30.0,
+    "renewable_score": 21.0,
+    "price_signal": 83.0,
+    "carbon_intensity": 79.0
+  },
+  {
+    "timestamp": "2026-09-12T19:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 4.4,
+    "temperature": 29.2,
+    "renewable_score": 16.0,
+    "price_signal": 87.0,
+    "carbon_intensity": 84.0
+  },
+  {
+    "timestamp": "2026-09-12T20:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 4.2,
+    "temperature": 28.8,
+    "renewable_score": 15.0,
+    "price_signal": 88.0,
+    "carbon_intensity": 85.0
+  },
+  {
+    "timestamp": "2026-09-12T21:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 4.0,
+    "temperature": 28.3,
+    "renewable_score": 14.5,
+    "price_signal": 88.5,
+    "carbon_intensity": 85.5
+  },
+  {
+    "timestamp": "2026-09-12T22:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 3.8,
+    "temperature": 28.0,
+    "renewable_score": 13.8,
+    "price_signal": 89.0,
+    "carbon_intensity": 86.0
+  },
+  {
+    "timestamp": "2026-09-12T23:00:00Z",
+    "solar_irradiance": 0.0,
+    "wind_speed": 3.7,
+    "temperature": 27.8,
+    "renewable_score": 13.4,
+    "price_signal": 89.3,
+    "carbon_intensity": 86.6
+  }
+]
