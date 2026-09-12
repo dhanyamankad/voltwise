@@ -62,7 +62,8 @@ def _evaluate_window(
     start_dt: datetime,
     duration_hours: float,
     preference: str,
-    signals: List[RenewableSignal]
+    signals: List[RenewableSignal],
+    charging_rate_kw: float = 50.0
 ) -> Tuple[float, float, float, float]:
     """
     Evaluates a candidate time window [start_dt, start_dt + duration_hours].
@@ -75,8 +76,8 @@ def _evaluate_window(
     total_price = 0.0
     total_co2 = 0.0
 
-    # Assume standard charging power = 50kW for energy estimate calculation
-    energy_kwh = 50.0 * step_hours
+    # Effective energy delivered per 15-min sample step
+    energy_kwh = charging_rate_kw * step_hours
 
     for i in range(steps):
         sample_dt = start_dt + timedelta(hours=i * step_hours)
@@ -89,13 +90,11 @@ def _evaluate_window(
     avg_green = total_green / steps
 
     # Score calculation based on preference
-    # Higher score is better
     if preference == "greenest":
         composite_score = avg_green * 2.0 - (total_price * 0.1)
     elif preference == "cheapest":
         composite_score = (100.0 - total_price * 2.0) + (avg_green * 0.5)
     else:  # balanced
-        # 60% weight on green score, 40% on cost minimization
         composite_score = (avg_green * 0.6) + ((100.0 - total_price) * 0.4)
 
     return composite_score, avg_green, total_price, total_co2
@@ -138,8 +137,6 @@ def build_schedule(
     else:
         base_start = datetime.utcnow()
 
-    session_id_counter = 1
-
     for req in sorted_requests:
         created_dt = parse_iso_datetime(req.created_at) if req.created_at else base_start
         search_start = max(base_start, created_dt)
@@ -159,9 +156,9 @@ def build_schedule(
             if duration_hours <= 0:
                 continue
 
+            effective_rate = min(req.charging_rate_kw, port.power_limit_kw)
             max_start_dt = deadline_dt - timedelta(hours=duration_hours)
             if max_start_dt < search_start:
-                # Tight deadline - schedule immediately if feasible
                 max_start_dt = search_start
 
             # Evaluate 15-minute slot candidates
@@ -175,7 +172,7 @@ def build_schedule(
                 if is_port_available(port.id, current_candidate, candidate_end, scheduled_sessions):
                     if candidate_end <= deadline_dt or req.vehicle_class == "priority":
                         comp_score, avg_green, total_price, total_co2 = _evaluate_window(
-                            current_candidate, duration_hours, req.preference, signal
+                            current_candidate, duration_hours, req.preference, signal, effective_rate
                         )
 
                         # Small bonus for priority vehicles to ensure prompt assignment
@@ -209,8 +206,11 @@ def build_schedule(
                 is_rescheduled=False
             )
 
+            # Unique session ID tied to EV request ID
+            sess_id = f"session_{req.id}"
+
             sess = Session(
-                id=f"session_{session_id_counter:03d}",
+                id=sess_id,
                 ev_id=req.id,
                 port_id=port_id,
                 start_time=start_str,
@@ -223,7 +223,6 @@ def build_schedule(
                 version=1
             )
             scheduled_sessions.append(sess)
-            session_id_counter += 1
 
     return scheduled_sessions
 
@@ -241,12 +240,12 @@ def reoptimize(
         return []
 
     changed_sessions: List[Session] = []
+    working_sessions = list(current_sessions)  # Dynamic working copy to prevent slot overlaps
 
-    # Map signal timestamps for fast lookup
     base_start = min(parse_iso_datetime(s.timestamp) for s in updated_signal)
 
-    for session in current_sessions:
-        # Hard constraint: Priority sessions (indicated in reason or protected) or active/completed are untouched
+    for session in working_sessions:
+        # Hard constraint: Priority sessions or active/completed are untouched
         if session.status in ("charging", "completed", "cancelled"):
             continue
 
@@ -262,19 +261,17 @@ def reoptimize(
             cur_start, duration_hours, "balanced", updated_signal
         )
 
-        # Search for alternative windows on the same port
         best_candidate = None
         best_green = cur_green
 
-        # Search horizon: 12 hours from base_start
         search_dt = max(base_start, cur_start - timedelta(hours=2))
         max_search_dt = cur_start + timedelta(hours=8)
 
         while search_dt <= max_search_dt:
             candidate_end = search_dt + timedelta(hours=duration_hours)
 
-            # Check port availability against other sessions
-            if is_port_available(session.port_id, search_dt, candidate_end, current_sessions, ignore_session_id=session.id):
+            # Check port availability against dynamic working_sessions
+            if is_port_available(session.port_id, search_dt, candidate_end, working_sessions, ignore_session_id=session.id):
                 _, cand_green, cand_price, cand_co2 = _evaluate_window(
                     search_dt, duration_hours, "balanced", updated_signal
                 )
@@ -292,6 +289,7 @@ def reoptimize(
             new_end_str = format_iso_datetime(new_end)
 
             old_start_str = session.start_time
+            old_end_str = session.end_time
 
             # Update session properties
             session.start_time = new_start_str
@@ -309,6 +307,11 @@ def reoptimize(
                 trigger_cause="Renewable grid score dropped"
             )
 
+            # Attach temporary attributes for WebSocket event generator
+            setattr(session, "_old_start_time", old_start_str)
+            setattr(session, "_old_end_time", old_end_str)
+
             changed_sessions.append(session)
 
     return changed_sessions
+

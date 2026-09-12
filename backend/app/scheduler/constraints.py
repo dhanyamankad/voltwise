@@ -21,15 +21,22 @@ def parse_iso_datetime(dt_str: str) -> datetime:
     """Parses ISO 8601 datetime strings robustly, standardizing on naive datetimes."""
     if not dt_str:
         return datetime.utcnow()
-    cleaned = dt_str.replace("Z", "+00:00")
+    cleaned = dt_str.replace("Z", "+00:00").strip()
     try:
         dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt
     except ValueError:
-        # Fallback format parsing
-        dt = datetime.strptime(cleaned.split(".")[0], "%Y-%m-%dT%H:%M:%S")
-    if dt.tzinfo is not None:
-        dt = dt.replace(tzinfo=None)
-    return dt
+        pass
+
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(cleaned.split("+")[0].split(".")[0], fmt)
+        except ValueError:
+            continue
+
+    return datetime.utcnow()
 
 
 def format_iso_datetime(dt: datetime) -> str:
