@@ -22,12 +22,19 @@ def parse_iso_datetime(dt_str: str) -> datetime:
     if not dt_str:
         return datetime.utcnow()
     # Normalize ISO format (e.g. Z to +00:00)
-    cleaned = dt_str.replace("Z", "+00:00")
+    cleaned = dt_str.replace("Z", "+00:00").strip()
     try:
         return datetime.fromisoformat(cleaned)
     except ValueError:
-        # Fallback format parsing
-        return datetime.strptime(cleaned.split(".")[0], "%Y-%m-%dT%H:%M:%S")
+        pass
+
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(cleaned.split("+")[0].split(".")[0], fmt)
+        except ValueError:
+            continue
+
+    return datetime.utcnow()
 
 
 def format_iso_datetime(dt: datetime) -> str:

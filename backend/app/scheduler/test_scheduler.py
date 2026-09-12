@@ -104,6 +104,25 @@ class TestVoltWiseScheduler(unittest.TestCase):
             self.assertIsInstance(session.reason, str)
             self.assertGreater(len(session.reason), 10)
 
+    def test_unique_session_ids(self):
+        """Verify build_schedule generates unique IDs tied to request IDs."""
+        reqs, ports, signal = scenario_three_normal_evs()
+        sessions = build_schedule(reqs, ports, signal)
+        session_ids = [s.id for s in sessions]
+        self.assertEqual(len(session_ids), len(set(session_ids)))
+        self.assertTrue(all(s.id.startswith("session_EV-") for s in sessions))
+
+    def test_old_window_tracking_in_reoptimize(self):
+        """Verify reoptimize attaches _old_start_time and _old_end_time to changed sessions."""
+        reqs, ports, signal_baseline = scenario_priority_ambulance()
+        sessions = build_schedule(reqs, ports, signal_baseline)
+        signal_drop = get_renewable_signal_drop()
+
+        changed = reoptimize(sessions, signal_drop)
+        for s in changed:
+            self.assertTrue(hasattr(s, "_old_start_time"))
+            self.assertTrue(hasattr(s, "_old_end_time"))
+
 
 if __name__ == "__main__":
     unittest.main()
