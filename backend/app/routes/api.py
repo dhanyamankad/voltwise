@@ -20,7 +20,7 @@ from backend.app.ws import manager
 
 # --- Modular Imports for Scheduler and Forecasting ---
 # Tanvi's real Scheduler engine:
-from backend.app.scheduler.engine import build_schedule, reoptimize
+from backend.app.scheduler.engine import build_schedule, reoptimize, get_port_queues
 from backend.app.scheduler.models import Session as SchedulerSession
 # Vanshi's real Forecasting & Simulation engine:
 from backend.app.forecasting.signal import get_renewable_signal
@@ -152,6 +152,20 @@ async def get_schedule():
         pending_requests=pending_requests,
         current_signal=current_signal
     )
+
+
+@router.get("/schedule/queues")
+async def get_port_queues_endpoint():
+    """
+    Returns separate, chronologically sorted queues for Port 1 and Port 2.
+    """
+    active_sessions = db.get_active_sessions()
+    sched_sessions = [SchedulerSession(**s.model_dump()) for s in active_sessions]
+    raw_queues = get_port_queues(sched_sessions)
+    return {
+        port_id: [_to_pydantic_session(s) for s in sessions]
+        for port_id, sessions in raw_queues.items()
+    }
 
 
 @router.get("/renewable-signal", response_model=list[RenewableSignal])

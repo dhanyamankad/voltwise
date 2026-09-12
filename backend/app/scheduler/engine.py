@@ -164,36 +164,39 @@ def build_schedule(
             effective_rate = min(req.charging_rate_kw, port.power_limit_kw)
             max_start_dt = deadline_dt - timedelta(hours=duration_hours)
             if max_start_dt < search_start:
-                max_start_dt = search_start
+                continue
 
             # Evaluate 15-minute slot candidates
             current_candidate = search_start
             slot_minutes = 15
 
-            while current_candidate <= max_start_dt + timedelta(minutes=slot_minutes):
+            while current_candidate <= max_start_dt:
                 candidate_end = current_candidate + timedelta(hours=duration_hours)
 
-                # Hard constraint check: Port availability & Deadline
-                if is_port_available(port.id, current_candidate, candidate_end, scheduled_sessions):
-                    if candidate_end <= deadline_dt or req.vehicle_class == "priority":
-                        comp_score, avg_green, total_price, total_co2 = _evaluate_window(
-                            current_candidate, duration_hours, req.preference, signal, effective_rate
+                # Hard constraint check: Port availability & Strict Deadline Completion
+                if candidate_end <= deadline_dt and is_port_available(port.id, current_candidate, candidate_end, scheduled_sessions):
+                    comp_score, avg_green, total_price, total_co2 = _evaluate_window(
+                        current_candidate, duration_hours, req.preference, signal, effective_rate
+                    )
+
+                    # Priority bonus for emergency/priority vehicles
+                    if req.vehicle_class == "priority":
+                        comp_score += 1000.0
+
+                    # Load balance across ports: slight preference to less utilized port for identical start times
+                    current_port_session_count = sum(1 for s in scheduled_sessions if s.port_id == port.id)
+                    adjusted_score = comp_score - (current_port_session_count * 0.5)
+
+                    if adjusted_score > best_score:
+                        best_score = adjusted_score
+                        best_option = (
+                            port.id,
+                            current_candidate,
+                            candidate_end,
+                            avg_green,
+                            total_price,
+                            total_co2
                         )
-
-                        # Small bonus for priority vehicles to ensure prompt assignment
-                        if req.vehicle_class == "priority":
-                            comp_score += 1000.0
-
-                        if comp_score > best_score:
-                            best_score = comp_score
-                            best_option = (
-                                port.id,
-                                current_candidate,
-                                candidate_end,
-                                avg_green,
-                                total_price,
-                                total_co2
-                            )
 
                 current_candidate += timedelta(minutes=slot_minutes)
 
@@ -321,4 +324,23 @@ def reoptimize(
             changed_sessions.append(session)
 
     return changed_sessions
+
+
+def get_port_queues(sessions: List[Session]) -> Dict[str, List[Session]]:
+    """
+    Groups active/scheduled sessions into per-port chronological queues.
+    Returns dict mapping port_id (e.g. 'port_1', 'port_2') to list of Sessions sorted by start_time.
+    """
+    queues: Dict[str, List[Session]] = {"port_1": [], "port_2": []}
+    for session in sessions:
+        if session.status in ("scheduled", "charging", "moved"):
+            if session.port_id in queues:
+                queues[session.port_id].append(session)
+            else:
+                queues[session.port_id] = [session]
+
+    for port_id in queues:
+        queues[port_id].sort(key=lambda s: parse_iso_datetime(s.start_time))
+
+    return queues
 
