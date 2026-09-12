@@ -5,7 +5,7 @@ Implements greedy priority-queue scheduling and dynamic re-optimization logic.
 Pure Python module with zero third-party dependencies.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import math
 from typing import List, Dict, Tuple, Optional
 
@@ -141,7 +141,7 @@ def build_schedule(
     sorted_requests = priority_reqs + normal_reqs
 
     # Determine earliest available start time (must be at or after current UTC time)
-    now_utc = datetime.utcnow()
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     if signal:
         min_signal_dt = min(parse_iso_datetime(s.timestamp) for s in signal)
         base_start = max(now_utc, min_signal_dt)

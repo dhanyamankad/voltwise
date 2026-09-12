@@ -77,11 +77,23 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
   const port1 = stationState?.ports.find((p) => p.id === 'port_1');
   const port2 = stationState?.ports.find((p) => p.id === 'port_2');
 
-  // Filter active valid sessions (exclude past end times)
+  // Filter active valid sessions according to timeframe filter
   const now = new Date();
   const validActiveSessions = (stationState?.active_sessions || []).filter(s => {
     try {
+      const startDt = new Date(s.start_time.endsWith('Z') ? s.start_time : `${s.start_time}Z`);
       const endDt = new Date(s.end_time.endsWith('Z') ? s.end_time : `${s.end_time}Z`);
+
+      if (timeframeFilter === 'today') {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        return endDt.getTime() >= startOfToday;
+      } else if (timeframeFilter === '7days') {
+        const sevenDaysAgo = now.getTime() - 7 * 24 * 3600 * 1000;
+        return endDt.getTime() >= sevenDaysAgo;
+      } else if (timeframeFilter === '30days') {
+        const thirtyDaysAgo = now.getTime() - 30 * 24 * 3600 * 1000;
+        return endDt.getTime() >= thirtyDaysAgo;
+      }
       return endDt.getTime() >= now.getTime() - 5 * 60 * 1000;
     } catch {
       return true;
@@ -284,20 +296,25 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 </div>
 
                 {/* Data-driven Solar + Wind Bar for Bay 1 */}
-                <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10 font-sans">
-                  <div className="flex justify-between font-sans text-xs">
-                    <span className="text-slate-400 font-medium">Renewable Energy Score</span>
-                    <span className="font-sans font-bold text-cyan-400">{session1.green_score}/100</span>
-                  </div>
-                  <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden flex font-sans">
-                    <div className="h-full bg-solar" style={{ width: `${Math.round(session1.green_score * 0.6)}%` }}></div>
-                    <div className="h-full bg-wind" style={{ width: `${session1.green_score - Math.round(session1.green_score * 0.6)}%` }}></div>
-                  </div>
-                  <div className="flex justify-between font-sans text-[11px]">
-                    <span className="text-solar font-bold">{Math.round(session1.green_score * 0.6)}% Solar</span>
-                    <span className="text-wind font-bold">{session1.green_score - Math.round(session1.green_score * 0.6)}% Wind</span>
-                  </div>
-                </div>
+                {(() => {
+                  const s1B = calculateRenewableBreakdown(session1.green_score, currentSignal);
+                  return (
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10 font-sans">
+                      <div className="flex justify-between font-sans text-xs">
+                        <span className="text-slate-400 font-medium">Renewable Energy Score</span>
+                        <span className="font-sans font-bold text-cyan-400">{session1.green_score}/100</span>
+                      </div>
+                      <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden flex font-sans">
+                        <div className="h-full bg-solar" style={{ width: `${s1B.solarScore}%` }}></div>
+                        <div className="h-full bg-wind" style={{ width: `${s1B.windScore}%` }}></div>
+                      </div>
+                      <div className="flex justify-between font-sans text-[11px]">
+                        <span className="text-solar font-bold">{s1B.solarScore}% Solar</span>
+                        <span className="text-wind font-bold">{s1B.windScore}% Wind</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="grid grid-cols-2 gap-3 pt-2 font-sans">
                   <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-0.5 font-sans">
@@ -403,20 +420,25 @@ export const OperatorView: React.FC<OperatorViewProps> = ({ onTriggerSimDrop }) 
                 </div>
 
                 {/* Stacked Solar + Wind Bar for Bay 2 */}
-                <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10 font-sans">
-                  <div className="flex justify-between font-sans text-xs">
-                    <span className="text-slate-400 font-medium">Renewable Energy Score</span>
-                    <span className="font-sans font-bold text-white">{session2.green_score}/100</span>
-                  </div>
-                  <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden flex font-sans">
-                    <div className="h-full bg-solar" style={{ width: `${Math.round(session2.green_score * 0.4)}%` }}></div>
-                    <div className="h-full bg-wind" style={{ width: `${session2.green_score - Math.round(session2.green_score * 0.4)}%` }}></div>
-                  </div>
-                  <div className="flex justify-between font-sans text-[11px]">
-                    <span className="text-solar font-bold">{Math.round(session2.green_score * 0.4)}% Solar</span>
-                    <span className="text-wind font-bold">{session2.green_score - Math.round(session2.green_score * 0.4)}% Wind</span>
-                  </div>
-                </div>
+                {(() => {
+                  const s2B = calculateRenewableBreakdown(session2.green_score, currentSignal);
+                  return (
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10 font-sans">
+                      <div className="flex justify-between font-sans text-xs">
+                        <span className="text-slate-400 font-medium">Renewable Energy Score</span>
+                        <span className="font-sans font-bold text-white">{session2.green_score}/100</span>
+                      </div>
+                      <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden flex font-sans">
+                        <div className="h-full bg-solar" style={{ width: `${s2B.solarScore}%` }}></div>
+                        <div className="h-full bg-wind" style={{ width: `${s2B.windScore}%` }}></div>
+                      </div>
+                      <div className="flex justify-between font-sans text-[11px]">
+                        <span className="text-solar font-bold">{s2B.solarScore}% Solar</span>
+                        <span className="text-wind font-bold">{s2B.windScore}% Wind</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="grid grid-cols-2 gap-3 pt-2 font-sans">
                   <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-0.5 font-sans">

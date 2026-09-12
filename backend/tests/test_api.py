@@ -20,6 +20,12 @@ from backend.app.scheduler.engine import build_schedule, reoptimize
 @pytest.fixture(autouse=True)
 def setup_teardown():
     db.init_db()
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM sessions")
+        cursor.execute("DELETE FROM ev_requests")
+        cursor.execute("UPDATE ports SET status = 'idle', current_session_id = NULL")
+        conn.commit()
     yield
     # Cleanup test db
     test_db = os.environ["VOLTWISE_DB_PATH"]
@@ -58,7 +64,8 @@ def test_get_renewable_signal(client):
 
 
 def test_create_ev_request_and_get_session(client):
-    deadline = (datetime.now() + timedelta(hours=4)).isoformat()
+    from datetime import timezone
+    deadline = (datetime.now(timezone.utc) + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "vehicle_class": "normal",
         "current_soc": 30.0,
@@ -101,8 +108,9 @@ def test_get_schedule_station_state(client):
 
 
 def test_simulate_renewable_drop_and_reoptimization(client):
+    from datetime import timezone
     # Create a flexible session
-    deadline = (datetime.now() + timedelta(hours=6)).isoformat()
+    deadline = (datetime.now(timezone.utc) + timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
     client.post("/api/ev-requests", json={
         "vehicle_class": "normal",
         "current_soc": 35.0,
@@ -224,12 +232,8 @@ def test_port_returns_to_idle_after_session_ends(client):
 
 
 def test_rejected_request_does_not_leak_into_pending_queue(client):
-    """
-    Regression test: an EV request the scheduler cannot satisfy must not be persisted, since
-    the driver already received a 400 error — otherwise it lingers forever as an unresolvable
-    "ghost" entry in the operator's pending-requests queue.
-    """
-    deadline = (datetime.now() + timedelta(minutes=1)).isoformat()
+    from datetime import timezone
+    deadline = (datetime.now(timezone.utc) + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
     response = client.post("/api/ev-requests", json={
         "vehicle_class": "normal",
         "current_soc": 10.0,

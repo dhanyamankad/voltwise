@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Toaster, toast } from 'sonner';
 import { Header } from './components/Header';
 import { DriverView } from './views/DriverView';
@@ -8,6 +8,8 @@ import { useLiveUpdates } from './hooks/useLiveUpdates';
 import { PlanChangedToast } from './components/PlanChangedToast';
 import { PlanChangedEvent } from './types';
 import BackgroundSnippets from './components/ui/background-snippets';
+import { fetchSchedule } from './api/client';
+import { calculateRenewableBreakdown } from './lib/utils';
 
 export const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'landing' | 'driver' | 'operator'>('landing');
@@ -29,12 +31,31 @@ export const App: React.FC = () => {
     );
   };
 
+  const [energyMix, setEnergyMix] = useState<{ solarPct: number; windPct: number }>({ solarPct: 52, windPct: 32 });
+
+  useEffect(() => {
+    const updateMix = async () => {
+      try {
+        const sched = await fetchSchedule();
+        if (sched?.current_signal) {
+          const breakdown = calculateRenewableBreakdown(sched.current_signal.renewable_score, sched.current_signal);
+          setEnergyMix({ solarPct: breakdown.solarScore, windPct: breakdown.windScore });
+        }
+      } catch (err) {
+        console.warn('[App] Could not fetch live header mix:', err);
+      }
+    };
+    updateMix();
+    window.addEventListener('voltwise:state_update', updateMix);
+    return () => window.removeEventListener('voltwise:state_update', updateMix);
+  }, []);
+
   return (
     <div className="min-h-screen font-sans antialiased bg-[#0D1117] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-400">
       <Toaster position="bottom-right" theme="dark" expand={true} />
       
       {activeView !== 'landing' && (
-        <Header activeView={activeView} setActiveView={setActiveView} />
+        <Header activeView={activeView} setActiveView={setActiveView} solarPct={energyMix.solarPct} windPct={energyMix.windPct} />
       )}
 
       {activeView === 'landing' ? (

@@ -230,7 +230,7 @@ export const DriverView: React.FC = () => {
           <div className="flex flex-col font-sans">
             <span className="font-sans text-xs text-slate-400">2. Station Charging Bay</span>
             <span className="font-sans text-sm font-bold text-cyan-400">
-              {recommendation ? `Port ${recommendation.port_id === 'port_2' ? '2' : '1'} (${chargingRateKw} kW)` : 'Port 1 (50 kW)'}
+              {recommendation ? `Port ${recommendation.port_id === 'port_2' ? '2' : '1'} (${chargingRateKw} kW)` : `Auto-Allocated Port (${chargingRateKw} kW)`}
             </span>
             <span className="font-sans text-[11px] text-slate-400">Smart load balancing active</span>
           </div>
