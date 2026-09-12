@@ -109,14 +109,33 @@ export const DriverView: React.FC = () => {
 
   const isInvalidSoc = currentSoc > targetSoc;
 
+function parseTimeToFutureISO(timeStr: string): string {
+  const now = new Date();
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3]?.toUpperCase();
+
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+
+    const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
+    if (targetDate.getTime() <= now.getTime()) {
+      targetDate.setDate(targetDate.getDate() + 1);
+    }
+    return targetDate.toISOString();
+  }
+  return new Date(now.getTime() + 6 * 3600 * 1000).toISOString();
+}
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isInvalidSoc) return;
 
     setIsLoading(true);
     try {
-      // Calculate a valid future deadline ISO timestamp (default 6 hours ahead) for the backend scheduler
-      const futureDeadline = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
+      const futureDeadline = parseTimeToFutureISO(deadline);
 
       const requestData: EVRequest = {
         vehicle_class: vehicleClass,

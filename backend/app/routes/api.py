@@ -63,6 +63,13 @@ async def create_ev_request(req_in: EVRequestCreate):
     now_iso = datetime.now().isoformat()
     ev_id = f"ev_{uuid.uuid4().hex[:8]}"
     
+    # Validate SOC Range
+    if req_in.current_soc > req_in.target_soc:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid SOC Range: Current SOC cannot be greater than Target SOC."
+        )
+
     ev_req = EVRequest(
         id=ev_id,
         vehicle_class=req_in.vehicle_class,
