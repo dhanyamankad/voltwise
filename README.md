@@ -16,7 +16,7 @@ An enterprise-grade, AI-orchestrated EV charging platform that aligns electric v
 
 | Component | Platform | Status | Live Link |
 | :--- | :--- | :--- | :--- |
-| **Frontend Application** | Netlify | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | Hosted on Netlify (React SPA + Tailwind CSS) |
+| **Frontend Application** | Netlify | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | [`https://voltwise-india.netlify.app/`](https://voltwise-india.netlify.app/) |
 | **Backend API & WebSockets** | Render | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | [`https://voltwise-backend-s9py.onrender.com`](https://voltwise-backend-s9py.onrender.com) |
 | **Interactive API Documentation** | Render | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | [`https://voltwise-backend-s9py.onrender.com/docs`](https://voltwise-backend-s9py.onrender.com/docs) |
 
