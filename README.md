@@ -2,11 +2,23 @@
 
 [![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite%20%7C%20Tailwind-61DAFB?logo=react&logoColor=black)](frontend/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.11-009688?logo=fastapi&logoColor=white)](backend/)
+[![Netlify](https://img.shields.io/badge/Frontend-Netlify%20Live-00C7B7?logo=netlify&logoColor=white)](#-production-deployments)
+[![Render](https://img.shields.io/badge/Backend-Render%20Live-46E3B7?logo=render&logoColor=white)](#-production-deployments)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)]()
 
 **HackOut'26 — Team ByteSized Brains**  
 An enterprise-grade, AI-orchestrated EV charging platform that aligns electric vehicle charging demand with real-time solar & wind power availability to shave peak grid loads, cut carbon emissions, and reduce charging costs.
+
+---
+
+## 🌐 Production Deployments
+
+| Component | Platform | Status | Live Link |
+| :--- | :--- | :--- | :--- |
+| **Frontend Application** | Netlify | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | Hosted on Netlify (React SPA + Tailwind CSS) |
+| **Backend API & WebSockets** | Render | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | [`https://voltwise-backend-s9py.onrender.com`](https://voltwise-backend-s9py.onrender.com) |
+| **Interactive API Documentation** | Render | ![Live](https://img.shields.io/badge/Status-Live-brightgreen) | [`https://voltwise-backend-s9py.onrender.com/docs`](https://voltwise-backend-s9py.onrender.com/docs) |
 
 ---
 
@@ -51,14 +63,21 @@ An enterprise-grade, AI-orchestrated EV charging platform that aligns electric v
 
 ```
 VoltWise/
+├── Dockerfile                  # Root Dockerfile for automated cloud container builds (Render)
+├── netlify.toml                # Netlify build configuration & SPA rewrite rules
+├── render.yaml                 # Render Blueprint deployment configuration
 ├── frontend/                   # React + Vite + Tailwind CSS Frontend
 │   ├── src/
-│   │   ├── api/client.ts       # Unified API client (Mock mode & FastAPI switcher)
+│   │   ├── api/client.ts       # Unified API client (FastAPI & WebSocket client)
 │   │   ├── components/         # Header, Toasts, Tubelight Navbar, Background Snippets
 │   │   ├── views/              # DriverView.tsx & OperatorView.tsx
 │   │   ├── types/index.ts      # TypeScript interfaces matching API contract
 │   │   └── App.tsx             # Root application container
-│   ├── public/logo.png         # High-contrast transparent VoltWise logo
+│   ├── public/
+│   │   ├── logo.png            # High-contrast transparent VoltWise logo
+│   │   └── _redirects          # Netlify SPA routing fallback
+│   ├── Dockerfile              # Multi-stage Dockerfile for React + Nginx
+│   ├── nginx.conf              # Production Nginx reverse proxy configuration
 │   ├── package.json
 │   └── vite.config.ts
 ├── backend/                    # FastAPI Backend Application
@@ -69,8 +88,9 @@ VoltWise/
 │   │   ├── ws.py               # WebSocket broadcaster
 │   │   ├── db.py               # SQLite database client
 │   │   └── main.py             # FastAPI entry point
+│   ├── Dockerfile              # Container image build for FastAPI
 │   └── requirements.txt
-├── deploy/                     # Deployment Configuration
+├── deploy/                     # Deployment Configurations & Scripts
 │   ├── docker-compose.yml      # Containerized deployment spec
 │   └── DEMO_RUNBOOK.md         # Live demo step-by-step instructions
 └── docs/                       # Project Documentation & Specifications
@@ -89,23 +109,15 @@ VoltWise/
 ### 1. Prerequisites
 - Node.js (v18+)
 - Python (3.11+)
+- Docker & Docker Compose (Optional for containerized run)
 
 ---
 
 ### 2. Running the Backend Server (FastAPI)
 
 ```bash
-cd backend
-python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# Linux/macOS:
-source venv/bin/activate
-
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+# Run from repository root
+python -m uvicorn backend.app.main:app --reload --port 8000
 ```
 Backend server will run at `http://localhost:8000` with interactive API docs at `http://localhost:8000/docs`.
 
@@ -120,8 +132,6 @@ npm run dev
 ```
 Frontend will run at `http://localhost:3000`.
 
-> **Note**: To connect the frontend directly to the live FastAPI backend server, open [`frontend/src/api/client.ts`](file:///d:/VoltWise/frontend/src/api/client.ts) and set `export const USE_MOCK = false;`.
-
 ---
 
 ### 4. Running via Docker Compose
@@ -130,6 +140,26 @@ Frontend will run at `http://localhost:3000`.
 cd deploy
 docker-compose up --build
 ```
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+
+---
+
+## 🚀 Cloud Deployment Setup
+
+### Netlify (Frontend)
+- **Base Directory**: `frontend`
+- **Build Command**: `npm run build`
+- **Publish Directory**: `frontend/dist`
+- **Environment Variables**:
+  - `VITE_API_BASE_URL` = `https://voltwise-backend-s9py.onrender.com/api`
+  - `VITE_WS_BASE_URL` = `wss://voltwise-backend-s9py.onrender.com/ws/updates`
+
+### Render (Backend)
+- Automated using [`render.yaml`](render.yaml) or root [`Dockerfile`](Dockerfile).
+- **Environment Variables**:
+  - `PYTHONPATH` = `.`
+  - `DEMO_CITY` = `Ahmedabad`
 
 ---
 
